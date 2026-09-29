@@ -1,0 +1,6 @@
+__pycache__/
+.DS_Store
+
+# 스크립트로 다시 만들 수 있는 파일
+data/
+catalog.html
