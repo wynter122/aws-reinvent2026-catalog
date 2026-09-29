@@ -60,6 +60,7 @@ a { color: var(--accent); }
 .head { padding-block: 1.5rem 1rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; align-items: baseline; }
 .head h1 { margin: 0; font: 700 1.625rem/1.2 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
 .head p { margin: 0; color: var(--muted); font-size: 0.8125rem; }
+#meta-date { margin-left: auto; }
 
 /* 상단 고정 바 */
 .bar {
@@ -269,6 +270,7 @@ select.btn { padding-right: 0.5rem; }
 <header class="wrap head">
   <h1>re:Invent 2026 세션 뷰어</h1>
   <p id="meta-line"></p>
+  <p id="meta-date"></p>
 </header>
 
 <div class="bar">
@@ -931,9 +933,8 @@ select.btn { padding-right: 0.5rem; }
 
   /* ---------- 시작 ---------- */
   const m = DATA.meta;
-  const topics = new Set(S.map(s => s.g)).size;
-  $('meta-line').textContent = '11월 30일(월) ~ 12월 4일(금), 라스베이거스 · 세션 ' + topics.toLocaleString() +
-    '개, 반복 포함 ' + S.length.toLocaleString() + '회 · 데이터 기준 ' + (m.modified || '').slice(0, 10);
+  $('meta-line').textContent = '11월 30일(월) ~ 12월 4일(금), 라스베이거스';
+  $('meta-date').textContent = '데이터 기준 ' + (m.modified || '').slice(0, 10);
   buildFacets();
   render();
   startSync();
