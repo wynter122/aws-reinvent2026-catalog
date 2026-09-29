@@ -201,7 +201,28 @@ select.btn { padding-right: 0.5rem; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 0.375rem; overflow: hidden; }
 .seg button { border: none; background: var(--surface); padding: 0.375rem 0.75rem; font-weight: 500; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-.status-r { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.status-r { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-left: auto; }
+
+/* 내보내기 메뉴 */
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; user-select: none; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu[open] summary { border-color: var(--accent); }
+.menu-list {
+  position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 4; min-width: 13rem;
+  display: flex; flex-direction: column; padding: 0.25rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.18);
+}
+.menu-h { margin: 0; padding: 0.375rem 0.625rem; font-size: 0.75rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+.menu-list button {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  border: none; background: none; border-radius: 0.25rem; padding: 0.4375rem 0.625rem; text-align: left; font-weight: 500;
+}
+.menu-list button:hover { background: var(--surface-2); }
+.menu-list button span { font: 400 0.75rem var(--font-data); color: var(--muted); }
+.menu-note { margin: 0; font-size: 0.8125rem; color: var(--muted); }
+.menu-note.bad { color: var(--warn); }
 
 .tt-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--surface); }
 .tt { min-width: 50rem; }
@@ -310,6 +331,16 @@ select.btn { padding-right: 0.5rem; }
           <button id="mode-list" data-mode="list" aria-pressed="false">목록</button>
         </div>
         <button class="btn" id="btn-copy" hidden>일정 복사</button>
+        <p class="menu-note" id="export-note" role="status" hidden></p>
+        <details class="menu" id="export" hidden>
+          <summary class="btn">내보내기</summary>
+          <div class="menu-list">
+            <p class="menu-h" id="export-h"></p>
+            <button data-export="csv">CSV<span>.csv</span></button>
+            <button data-export="xlsx">Excel<span>.xlsx</span></button>
+            <button data-export="json">JSON<span>.json</span></button>
+          </div>
+        </details>
       </div>
     </div>
     <div class="picked" id="picked"></div>
@@ -722,6 +753,222 @@ select.btn { padding-right: 0.5rem; }
     return mySchedule().list.map(s => [whenText(s), s.c, s.t, s.r ? '@ ' + s.r : ''].filter(Boolean).join('  ')).join('\n');
   }
 
+  /* ---------- 내보내기 ---------- */
+  // 화면에 추려진 목록을 그대로 파일로 만든다. "더 보기"로 아직 펼치지 않은 줄도 포함한다.
+  const joined = k => s => (s[k] || []).join('; ');
+  const num = v => { const n = Number(v); return v !== '' && v != null && Number.isFinite(n) ? n : (v || ''); };
+  const slotsOf = s => groups.get(s.g).length > 1 ? groups.get(s.g) : [];
+  // [머리글, 값, 엑셀 열 너비]
+  const EXPORT_COLS = [
+    ['코드', s => s.c, 14],
+    ['제목', s => s.t, 60],
+    ['유형', s => s.y, 18],
+    ['레벨', s => num(s.l), 8],
+    ['날짜', s => s.d, 12],
+    ['요일', s => s.d ? dayLabel(s.d).split(' ')[0] : '', 6],
+    ['시작', s => s.s, 8],
+    ['종료', s => s.e, 8],
+    ['길이(분)', s => num(s.len), 9],
+    ['건물', s => s.v, 18],
+    ['장소', s => s.r, 40],
+    ['정원', s => s.cap === '0' ? '' : num(s.cap), 8],
+    ['발표자', s => (s.sp || []).map(p => (p.n || '') + (p.j || p.o ? ' (' + [p.j, p.o].filter(Boolean).join(', ') + ')' : '')).join('; '), 50],
+    ['토픽', joined('tp'), 30],
+    ['관심 분야', joined('ai'), 30],
+    ['AWS 서비스', joined('sv'), 30],
+    ['대상 직무', joined('ro'), 30],
+    ['산업', joined('in'), 30],
+    ['진행 방식', joined('ft'), 24],
+    ['노트북 필요', s => s.lap ? 'Y' : '', 11],
+    ['스폰서', s => s.spon ? 'Y' : '', 8],
+    ['전체 진행 시간', s => slotsOf(s).map(x => x.c + ' ' + whenText(x) + (x.v ? ' @ ' + x.v : '')).join('; '), 50],
+    ['설명', s => s.a, 80],
+    ['공식 페이지', s => s.u, 50]
+  ];
+
+  function exportRows() {
+    return state.view === 'my' ? mySchedule().list : state.rows.map(r => r.s);
+  }
+  function exportTable(list) {
+    return [EXPORT_COLS.map(c => c[0])].concat(list.map(s => EXPORT_COLS.map(c => { const v = c[1](s); return v == null ? '' : v; })));
+  }
+
+  function toCSV(list) {
+    const cell = v => { const t = String(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    // 맨 앞의 BOM 은 엑셀이 한글을 UTF-8 로 읽게 한다
+    return '﻿' + exportTable(list).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
+  }
+
+  function toJSON(list) {
+    const filters = {};
+    if (state.view !== 'my') for (const f of FACETS) if (state.sel[f.k].size) filters[f.label] = f.values.filter(o => state.sel[f.k].has(o.v)).map(o => o.label);
+    const slot = x => ({ code: x.c, date: x.d || null, start: x.s || null, end: x.e || null, venue: x.v || null });
+    return JSON.stringify({
+      event: DATA.meta.event,
+      dataAsOf: DATA.meta.modified || null,
+      exportedAt: new Date().toISOString(),
+      view: state.view === 'my' ? 'my-schedule' : 'sessions',
+      query: state.view === 'my' ? '' : state.q,
+      filters,
+      count: list.length,
+      sessions: list.map(s => ({
+        code: s.c, group: s.g, title: s.t, type: s.y, level: s.l || null, track: s.tr || null,
+        date: s.d || null, start: s.s || null, end: s.e || null, minutes: s.len || null,
+        venue: s.v || null, room: s.r || null, capacity: s.cap && s.cap !== '0' ? num(s.cap) : null,
+        speakers: (s.sp || []).map(p => ({ name: p.n || '', title: p.j || '', company: p.o || '' })),
+        topics: s.tp || [], areasOfInterest: s.ai || [], services: s.sv || [],
+        roles: s.ro || [], industries: s.in || [], features: s.ft || [],
+        laptopRequired: !!s.lap, sponsored: !!s.spon,
+        slots: slotsOf(s).map(slot),
+        abstract: s.a || '', url: s.u
+      }))
+    }, null, 2);
+  }
+
+  // 압축하지 않는 zip. xlsx 는 XML 몇 개를 zip 으로 묶은 것이라 이것으로 충분하다
+  const CRC = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(b) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zip(files) {
+    const enc = new TextEncoder();
+    const now = new Date();
+    const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const parts = [], central = [];
+    let offset = 0;
+    for (const [name, text] of files) {
+      const nm = enc.encode(name), body = enc.encode(text), crc = crc32(body);
+      const head = (sig, extra) => {
+        const b = new Uint8Array(extra), v = new DataView(b.buffer);
+        let p = 0;
+        v.setUint32(p, sig, true); p += 4;
+        if (extra === 46) { v.setUint16(p, 20, true); p += 2; }
+        v.setUint16(p, 20, true); v.setUint16(p + 2, 0x0800, true); v.setUint16(p + 4, 0, true);
+        v.setUint16(p + 6, time, true); v.setUint16(p + 8, date, true);
+        v.setUint32(p + 10, crc, true); v.setUint32(p + 14, body.length, true); v.setUint32(p + 18, body.length, true);
+        v.setUint16(p + 22, nm.length, true);
+        if (extra === 46) v.setUint32(42, offset, true);
+        return b;
+      };
+      parts.push(head(0x04034b50, 30), nm, body);
+      central.push(head(0x02014b50, 46), nm);
+      offset += 30 + nm.length + body.length;
+    }
+    const size = central.reduce((n, b) => n + b.length, 0);
+    const end = new Uint8Array(22), v = new DataView(end.buffer);
+    v.setUint32(0, 0x06054b50, true);
+    v.setUint16(8, files.length, true); v.setUint16(10, files.length, true);
+    v.setUint32(12, size, true); v.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end]);
+  }
+
+  function toXLSX(list) {
+    const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const PKG = 'http://schemas.openxmlformats.org/package/2006';
+    const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    // XML 에 넣을 수 없는 제어 문자는 빼고, 엑셀의 셀 길이 한도에 맞춘다
+    const x = v => String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '').slice(0, 32767)
+      .replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const col = i => { let n = ''; for (i++; i > 0; i = Math.floor((i - 1) / 26)) n = String.fromCharCode(65 + (i - 1) % 26) + n; return n; };
+    const table = exportTable(list);
+    const rows = table.map((r, ri) => '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
+      if (v === '') return '';
+      const ref = ' r="' + col(ci) + (ri + 1) + '"' + (ri === 0 ? ' s="1"' : '');
+      return typeof v === 'number' ? '<c' + ref + '><v>' + v + '</v></c>'
+        : '<c' + ref + ' t="inlineStr"><is><t xml:space="preserve">' + x(v) + '</t></is></c>';
+    }).join('') + '</row>').join('');
+    const sheet = XML + '<worksheet xmlns="' + NS + '">' +
+      '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+      '<cols>' + EXPORT_COLS.map((c, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c[2] + '" customWidth="1"/>').join('') + '</cols>' +
+      '<sheetData>' + rows + '</sheetData>' +
+      '<autoFilter ref="A1:' + col(EXPORT_COLS.length - 1) + table.length + '"/></worksheet>';
+    return zip([
+      ['[Content_Types].xml', XML + '<Types xmlns="' + PKG + '/content-types">' +
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+        '<Default Extension="xml" ContentType="application/xml"/>' +
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+      ['_rels/.rels', XML + '<Relationships xmlns="' + PKG + '/relationships">' +
+        '<Relationship Id="rId1" Type="' + REL + '/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+      ['xl/workbook.xml', XML + '<workbook xmlns="' + NS + '" xmlns:r="' + REL + '">' +
+        '<sheets><sheet name="Sessions" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+      ['xl/_rels/workbook.xml.rels', XML + '<Relationships xmlns="' + PKG + '/relationships">' +
+        '<Relationship Id="rId1" Type="' + REL + '/worksheet" Target="worksheets/sheet1.xml"/>' +
+        '<Relationship Id="rId2" Type="' + REL + '/styles" Target="styles.xml"/></Relationships>'],
+      ['xl/styles.xml', XML + '<styleSheet xmlns="' + NS + '">' +
+        '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+        '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
+        '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+        '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+        '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>'],
+      ['xl/worksheets/sheet1.xml', sheet]
+    ]);
+  }
+
+  const EXPORTS = {
+    csv: { make: toCSV, mime: 'text/csv;charset=utf-8' },
+    xlsx: { make: toXLSX, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    json: { make: toJSON, mime: 'application/json' }
+  };
+
+  // Artifact 안에서는 뷰어가 저장을 확인받고 내려준다. 로컬 파일에서는 브라우저가 바로 받는다
+  async function saveFile(filename, data, mime) {
+    let dl = null;
+    if (window.claude && typeof window.claude.use === 'function') {
+      try { dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+    }
+    if (dl) { await dl.save({ filename, data }); return; }
+    const url = URL.createObjectURL(new Blob([data], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  let noteTimer = 0;
+  function exportNote(text, bad) {
+    const el = $('export-note');
+    el.textContent = text;
+    el.classList.toggle('bad', !!bad);
+    el.hidden = !text;
+    clearTimeout(noteTimer);
+    if (text) noteTimer = setTimeout(() => { el.hidden = true; }, 4000);
+  }
+
+  async function exportAs(kind) {
+    const list = exportRows();
+    if (!list.length || !EXPORTS[kind]) return;
+    const p = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const stamp = now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate()) + '-' + p(now.getHours()) + p(now.getMinutes());
+    const name = 'reinvent2026-' + (state.view === 'my' ? 'my-schedule' : 'sessions') + '-' + stamp + '.' + kind;
+    try {
+      await saveFile(name, EXPORTS[kind].make(list), EXPORTS[kind].mime);
+      exportNote(list.length.toLocaleString() + '개 세션을 ' + name + ' 로 내보냈습니다.');
+    } catch (e) {
+      if (e && e.code === 'declined') exportNote('');
+      else if (e && e.code === 'rate_limited') exportNote('저장 창이 이미 열려 있습니다. 잠시 후 다시 시도하세요.', true);
+      else exportNote('파일을 저장하지 못했습니다.', true);
+    }
+  }
+
+  function updateExport() {
+    const n = exportRows().length;
+    $('export').hidden = n === 0;
+    if (n === 0) $('export').open = false;
+    $('export-h').textContent = (state.view === 'my' ? '내 일정 ' : '추려진 ') + n.toLocaleString() + '개 세션';
+  }
+
   /* ---------- 공통 ---------- */
   function render() {
     const my = state.view === 'my';
@@ -738,6 +985,7 @@ select.btn { padding-right: 0.5rem; }
     $('copybox').hidden = true;
     if (my) { $('more').hidden = true; renderMy(); }
     else { $('btn-copy').hidden = true; renderAll(); }
+    updateExport();
   }
   function refilter() { state.shown = PAGE; render(); }
 
@@ -820,7 +1068,7 @@ select.btn { padding-right: 0.5rem; }
     store.set('ri26.fav', [...fav]);
     push();
     $('my-n').textContent = fav.size;
-    if (state.view === 'my') { renderMy(); return; }
+    if (state.view === 'my') { renderMy(); updateExport(); return; }
     const on = fav.has(code);
     document.querySelectorAll('[data-star]').forEach(b => {
       if (b.getAttribute('data-star') !== code) return;
@@ -848,8 +1096,10 @@ select.btn { padding-right: 0.5rem; }
 
   /* ---------- 이벤트 ---------- */
   document.addEventListener('click', e => {
-    const t = e.target.closest('[data-star],[data-open],[data-view],[data-pick],[data-mode],.pick');
+    if (!e.target.closest('#export summary')) $('export').open = false;
+    const t = e.target.closest('[data-star],[data-open],[data-view],[data-pick],[data-mode],[data-export],.pick');
     if (!t) return;
+    if (t.hasAttribute('data-export')) { exportAs(t.getAttribute('data-export')); return; }
     if (t.hasAttribute('data-pick')) {
       const code = t.getAttribute('data-pick');
       state.pick = code;
@@ -924,6 +1174,12 @@ select.btn { padding-right: 0.5rem; }
     const done = () => { $('btn-copy').textContent = '복사됨'; setTimeout(() => { $('btn-copy').textContent = '일정 복사'; }, 1500); };
     const fallback = () => { const b = $('copybox'); b.value = text; b.hidden = false; b.focus(); b.select(); };
     try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !$('export').open) return;
+    $('export').open = false;
+    $('export').querySelector('summary').focus();
   });
 
   window.addEventListener('hashchange', () => {
