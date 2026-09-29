@@ -92,7 +92,7 @@ select.btn { padding-right: 0.5rem; }
 .cols { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 1.75rem; padding-block: 1rem 4rem; align-items: start; }
 .rail {
   position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--bar-h));
-  max-height: calc(100vh - var(--bar-h) - 1rem); overflow-y: auto;
+  max-height: var(--rail-h, calc(100vh - var(--bar-h) - 1rem)); overflow-y: auto;
   padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem;
 }
 .toggles { display: flex; flex-direction: column; gap: 0.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--line); }
@@ -117,7 +117,20 @@ select.btn { padding-right: 0.5rem; }
   border: 1px solid var(--line); border-radius: 0.25rem; background: var(--surface);
 }
 .opts { list-style: none; margin: 0; padding: 0 0 0.75rem; font-size: 0.875rem; }
-.opts.scroll { max-height: 15rem; overflow-y: auto; }
+.opts:has(+ .facet-more:not([hidden])) { padding-bottom: 0.25rem; }
+.facet-more {
+  border: none; background: none; padding: 0 0 0.75rem; border-radius: 0.25rem;
+  font-size: 0.8125rem; color: var(--accent);
+}
+.facet-more:hover, .facet-info:hover { text-decoration: underline; }
+.facet-info {
+  border: none; background: none; padding: 0 0 0.5rem; border-radius: 0.25rem;
+  font-size: 0.8125rem; color: var(--accent);
+}
+.opt-d { display: none; margin-top: 0.0625rem; font-size: 0.75rem; line-height: 1.45; color: var(--muted); word-break: keep-all; overflow-wrap: anywhere; }
+.opt-d b { font-weight: 500; color: var(--fg); }
+.facet.explain .opt-d { display: block; }
+.facet.explain li + li { margin-top: 0.375rem; }
 .opt-l { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .opt-c { font: 400 0.75rem var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -174,6 +187,7 @@ select.btn { padding-right: 0.5rem; }
 .dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .dl .who { display: block; }
 .dl .who span { color: var(--muted); }
+.dl .note { display: block; color: var(--muted); }
 .slots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .slots li { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .slots .star svg { width: 1.125rem; height: 1.125rem; }
@@ -364,8 +378,33 @@ select.btn { padding-right: 0.5rem; }
   const TIGHT_GAP_MIN = 30; // 건물 간 이동에 이보다 여유가 적으면 경고
   const HOUR_PX = 76; // 시간표에서 1시간의 높이
   const SHORT_MIN = 40; // 이보다 짧은 세션은 시간표 블록에 코드와 시간만 표시
+  const FACET_LIMIT = 8; // 항목이 많은 필터는 이만큼만 보이고 나머지는 "더 보기"로 펼친다
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
   const LEVELS = { '100': '100 · 기초', '200': '200 · 중급', '300': '300 · 고급', '400': '400 · 전문가', '500': '500 · 최상급' };
+  // 세션 유형: [진행 형태, 일반 시간, 일정을 고를 때의 의미]
+  const TYPE_INFO = {
+    'Chalk talk': ['AWS 전문가의 짧은 설명 후 참석자 질의·토론', '60분', '토론 비중이 높고 참석자의 질문에 따라 내용이 달라짐'],
+    'Breakout session': ['한 명 이상의 발표자가 진행하는 강연', '60분', '많은 내용을 안정적으로 듣기 좋음'],
+    'Workshop': ['짧은 설명 후 AWS 환경에서 직접 솔루션 구축', '120분', '노트북 필수, 연속 2시간 확보 필요'],
+    "Builders' session": ['소규모 그룹에서 데모 후 전문가와 직접 구현', '60분', '밀도 높은 실습과 질문에 적합, 노트북 필수'],
+    'Lightning talk': ['한 주제를 압축한 짧은 발표·사례·데모', '20분', '빈 시간에 넣기 좋고 빠른 탐색에 적합'],
+    'Code talk': ['코드와 라이브 코딩 중심의 대화형 설명', '60분', '구현 내용을 따라가며 질문하는 형식'],
+    'Gamified learning': ['AWS 문제를 게임·경쟁 방식으로 해결', '90~180분', '실습형이며 노트북 필수'],
+    'Lab': ['주어진 시나리오를 자신의 속도로 실습', '시간 가변', '강의보다 개별 수행 중심, 일부는 노트북 필요'],
+    'Bootcamp': ['강사가 진행하는 장시간 집중 교육', '240~480분', '반일~종일 일정, 노트북 필수'],
+    'Exam prep': ['AWS 자격증 문제 풀이와 전문가 해설', '90~120분', '자격증 준비 목적, 노트북 필수']
+  };
+  const FORMAT_INFO = {
+    'Discussion': '발표자 일방 전달보다 참석자 질문·토론이 포함됨',
+    'Lecture-style': '발표자가 내용을 설명하는 강연 중심',
+    'Hands-on': '참석자가 직접 코드 작성·구성·실습 수행',
+    'AWS Partners': 'AWS 파트너가 제공하거나 후원하는 세션',
+    'Customer story': '고객의 실제 도입 사례와 경험 중심',
+    'Community-led': 'AWS 직원 중심이 아니라 커뮤니티 발표자가 주도',
+    'Self-paced': '강사의 공통 진도보다 참가자가 자신의 속도로 수행'
+  };
+  const typeKey = v => String(v || '').replace(/\u2019/g, "'");
+  const typeInfo = v => TYPE_INFO[typeKey(v)] || null;
   const TOD = ['오전 (12시 이전)', '오후 (12~17시)', '저녁 (17시 이후)'];
   const NONE = '미정';
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17l-5.4 3 1.1-6.1-4.5-4.3 6.1-.8z"/></svg>';
@@ -391,7 +430,8 @@ select.btn { padding-right: 0.5rem; }
   const FACETS = [
     { k: 'd', label: '요일', get: s => [s.d || NONE], fmt: v => v === NONE ? '일정 미정' : dayLabel(v), order: 'key', open: true },
     { k: 'tod', label: '시간대', get: s => [timeOfDay(s)], order: [...TOD, NONE] },
-    { k: 'y', label: '세션 유형', get: s => [s.y], open: true },
+    { k: 'y', label: '세션 유형', get: s => [s.y], open: true,
+      info: v => { const i = typeInfo(v); return i ? '<b>' + esc(i[1]) + '</b> · ' + esc(i[0]) + '<br>' + esc(i[2]) : ''; } },
     { k: 'l', label: '레벨', get: s => [s.l || NONE], fmt: v => LEVELS[v] || '레벨 없음', order: 'key', open: true },
     { k: 'tp', label: '토픽', get: s => s.tp || [] },
     { k: 'v', label: '장소', get: s => [s.v || NONE] },
@@ -399,7 +439,7 @@ select.btn { padding-right: 0.5rem; }
     { k: 'sv', label: 'AWS 서비스', get: s => s.sv || [] },
     { k: 'ro', label: '대상 직무', get: s => s.ro || [] },
     { k: 'in', label: '산업', get: s => s.in || [] },
-    { k: 'ft', label: '진행 방식', get: s => s.ft || [] },
+    { k: 'ft', label: '진행 방식', get: s => s.ft || [], info: v => esc(FORMAT_INFO[v] || '') },
     { k: 'tr', label: '트랙 코드', get: s => [s.tr], order: 'key' }
   ];
 
@@ -437,7 +477,7 @@ select.btn { padding-right: 0.5rem; }
     q: '',
     sort: 'time',
     sel: Object.fromEntries(FACETS.map(f => [f.k, new Set()])),
-    opts: Object.assign({ group: true, noSpon: false, noLap: false, myMode: 'grid' }, store.get('ri26.opts', {})),
+    opts: Object.assign({ group: true, noSpon: false, noLap: false, myMode: 'grid', info: {} }, store.get('ri26.opts', {})),
     open: new Set(),
     shown: PAGE,
     rows: []
@@ -448,14 +488,17 @@ select.btn { padding-right: 0.5rem; }
   function buildFacets() {
     $('facets').innerHTML = FACETS.map(f => {
       const long = f.values.length > 12;
-      return '<details class="facet" data-k="' + f.k + '"' + (f.open ? ' open' : '') + '>' +
+      const explain = f.info && state.opts.info[f.k];
+      return '<details class="facet' + (explain ? ' explain' : '') + '" data-k="' + f.k + '"' + (f.open ? ' open' : '') + '>' +
         '<summary><span>' + f.label + '</span><span class="facet-n" hidden></span></summary>' +
         (long ? '<input class="facet-q" id="fq-' + f.k + '" data-k="' + f.k + '" type="search" placeholder="' + f.label + ' 찾기" aria-label="' + f.label + ' 찾기">' : '') +
-        '<ul class="opts' + (long ? ' scroll' : '') + '">' +
+        (f.info ? '<button class="facet-info" id="fi-' + f.k + '" data-info="' + f.k + '" aria-pressed="' + !!explain + '">' + (explain ? '설명 숨기기' : '설명 보기') + '</button>' : '') +
+        '<ul class="opts">' +
         f.values.map((o, i) =>
           '<li><label><input type="checkbox" id="f-' + f.k + '-' + i + '" data-k="' + f.k + '" data-i="' + i + '">' +
-          '<span class="opt-l">' + esc(o.label) + '</span><span class="opt-c"></span></label></li>').join('') +
-        '</ul></details>';
+          '<span class="opt-l">' + esc(o.label) + (f.info && f.info(o.v) ? '<span class="opt-d">' + f.info(o.v) + '</span>' : '') +
+          '</span><span class="opt-c"></span></label></li>').join('') +
+        '</ul>' + (long ? '<button class="facet-more" id="fm-' + f.k + '" data-more="' + f.k + '" hidden></button>' : '') + '</details>';
     }).join('');
   }
 
@@ -464,14 +507,26 @@ select.btn { padding-right: 0.5rem; }
       const box = $('facets').querySelector('.facet[data-k="' + f.k + '"]');
       const fq = (box.querySelector('.facet-q') || { value: '' }).value.trim().toLowerCase();
       const items = box.querySelectorAll('li');
+      const more = box.querySelector('.facet-more');
+      // 목록 안에 따로 스크롤을 두면 휠이 그 안에 갇히므로, 긴 목록은 접어 두고 버튼으로 펼친다
+      const fold = more && !f.all && fq === '';
+      let shown = 0, folded = 0;
       f.values.forEach((o, i) => {
         const n = counts[f.k].get(o.v) || 0;
         const on = state.sel[f.k].has(o.v);
         const li = items[i];
         li.querySelector('input').checked = on;
         li.querySelector('.opt-c').textContent = n;
-        li.hidden = (n === 0 && !on) || (fq !== '' && !o.label.toLowerCase().includes(fq));
+        let hide = (n === 0 && !on) || (fq !== '' && !o.label.toLowerCase().includes(fq));
+        if (!hide && fold && !on && shown >= FACET_LIMIT) { hide = true; folded++; }
+        if (!hide) shown++;
+        li.hidden = hide;
       });
+      if (more) {
+        more.hidden = fq !== '' || (f.all ? shown <= FACET_LIMIT : folded === 0);
+        more.textContent = f.all ? '접기' : folded.toLocaleString() + '개 더 보기';
+        more.setAttribute('aria-expanded', String(!!f.all));
+      }
       const badge = box.querySelector('.facet-n');
       badge.hidden = state.sel[f.k].size === 0;
       badge.textContent = state.sel[f.k].size;
@@ -530,6 +585,8 @@ select.btn { padding-right: 0.5rem; }
 
   function detailHTML(s) {
     const rows = [];
+    const ti = typeInfo(s.y);
+    if (ti) rows.push(['유형', esc(s.y) + ' · 보통 ' + esc(ti[1]) + '<span class="note">' + esc(ti[0]) + '. ' + esc(ti[2]) + '.</span>']);
     if (s.sp && s.sp.length) {
       rows.push(['발표자', s.sp.map(p => '<span class="who">' + esc(p.n || '') +
         (p.j || p.o ? ' <span>' + esc([p.j, p.o].filter(Boolean).join(', ')) + '</span>' : '') + '</span>').join('')]);
@@ -541,9 +598,13 @@ select.btn { padding-right: 0.5rem; }
         '<li>' + starBtn(x) + '<span class="when' + (x.c === s.c ? ' here' : '') + '">' + esc(x.c) + ' · ' + esc(whenText(x)) + '</span>' +
         '<span>' + esc(x.v || '') + '</span></li>').join('') + '</ul>']);
     }
-    [['tp', '토픽'], ['ai', '관심 분야'], ['sv', '서비스'], ['ro', '대상 직무'], ['in', '산업'], ['ft', '진행 방식']].forEach(([k, label]) => {
+    [['tp', '토픽'], ['ai', '관심 분야'], ['sv', '서비스'], ['ro', '대상 직무'], ['in', '산업']].forEach(([k, label]) => {
       if (s[k] && s[k].length) rows.push([label, esc(s[k].join(' · '))]);
     });
+    if (s.ft && s.ft.length) {
+      rows.push(['진행 방식', s.ft.map(v => '<span class="who">' + esc(v) +
+        (FORMAT_INFO[v] ? ' <span>' + esc(FORMAT_INFO[v]) + '</span>' : '') + '</span>').join('')]);
+    }
     rows.push(['공식 페이지', '<a href="' + esc(s.u) + '" target="_blank" rel="noopener">카탈로그에서 ' + esc(s.c) + ' 열기</a>']);
     return '<div class="r-detail"><p>' + esc(s.a || '') + '</p><dl class="dl">' +
       rows.map(r => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('') + '</dl></div>';
@@ -556,7 +617,7 @@ select.btn { padding-right: 0.5rem; }
       ? '<span class="t-day">' + dayLabel(s.d) + '</span><span class="t-hm">' + s.s + '–' + s.e + '</span>' +
         (s.len ? '<span class="t-len">' + s.len + '분</span>' : '')
       : '<span class="t-day tbd">일정 미정</span>';
-    const chips = ['<span class="code">' + esc(s.c) + '</span>', '<span class="chip">' + esc(s.y) + '</span>'];
+    const chips = ['<span class="code">' + esc(s.c) + '</span>', '<span class="chip"' + (typeInfo(s.y) ? ' title="' + esc(typeInfo(s.y)[0] + ' · ' + typeInfo(s.y)[2]) + '"' : '') + '>' + esc(s.y) + '</span>'];
     if (s.l) chips.push('<span class="lv lv' + s.l[0] + '" title="' + esc(LEVELS[s.l] || s.l) + '">' + esc(s.l) + '</span>');
     if (s.lap) chips.push('<span class="chip">노트북 필요</span>');
     if (s.spon) chips.push('<span class="chip">스폰서</span>');
@@ -986,6 +1047,7 @@ select.btn { padding-right: 0.5rem; }
     if (my) { $('more').hidden = true; renderMy(); }
     else { $('btn-copy').hidden = true; renderAll(); }
     updateExport();
+    queueFitRail();
   }
   function refilter() { state.shown = PAGE; render(); }
 
@@ -1097,8 +1159,24 @@ select.btn { padding-right: 0.5rem; }
   /* ---------- 이벤트 ---------- */
   document.addEventListener('click', e => {
     if (!e.target.closest('#export summary')) $('export').open = false;
-    const t = e.target.closest('[data-star],[data-open],[data-view],[data-pick],[data-mode],[data-export],.pick');
+    const t = e.target.closest('[data-star],[data-open],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],.pick');
     if (!t) return;
+    if (t.hasAttribute('data-info')) {
+      const k = t.getAttribute('data-info');
+      const on = !state.opts.info[k];
+      state.opts.info = Object.assign({}, state.opts.info, { [k]: on });
+      store.set('ri26.opts', state.opts);
+      t.closest('.facet').classList.toggle('explain', on);
+      t.setAttribute('aria-pressed', String(on));
+      t.textContent = on ? '설명 숨기기' : '설명 보기';
+      return;
+    }
+    if (t.hasAttribute('data-more')) {
+      const f = FACETS.find(x => x.k === t.getAttribute('data-more'));
+      f.all = !f.all;
+      updateFacets(compute().counts);
+      return;
+    }
     if (t.hasAttribute('data-export')) { exportAs(t.getAttribute('data-export')); return; }
     if (t.hasAttribute('data-pick')) {
       const code = t.getAttribute('data-pick');
@@ -1182,6 +1260,19 @@ select.btn { padding-right: 0.5rem; }
     $('export').querySelector('summary').focus();
   });
 
+  // 필터 레일은 화면 아래 끝까지만 차지하게 한다. 맨 위에서는 머리말만큼 덜 쓸 수 있다
+  let railFrame = 0;
+  function fitRail() {
+    railFrame = 0;
+    const rail = $('rail');
+    if (rail.hidden || getComputedStyle(rail).position !== 'sticky') { rail.style.removeProperty('--rail-h'); return; }
+    const room = window.innerHeight - rail.getBoundingClientRect().top - 16;
+    rail.style.setProperty('--rail-h', Math.max(room, 160) + 'px');
+  }
+  const queueFitRail = () => { if (!railFrame) railFrame = requestAnimationFrame(fitRail); };
+  window.addEventListener('scroll', queueFitRail, { passive: true });
+  window.addEventListener('resize', queueFitRail);
+
   window.addEventListener('hashchange', () => {
     const v = location.hash === '#my' ? 'my' : 'all';
     if (v !== state.view) { state.view = v; render(); }
@@ -1193,6 +1284,7 @@ select.btn { padding-right: 0.5rem; }
   $('meta-date').textContent = '데이터 기준 ' + (m.modified || '').slice(0, 10);
   buildFacets();
   render();
+  fitRail();
   startSync();
 })();
 </script>
