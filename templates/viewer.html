@@ -318,7 +318,7 @@ select.btn { padding-right: 0.5rem; }
 </div>
 
 <footer class="wrap foot">
-  개인용 비공식 뷰어입니다. 일정과 장소는 바뀔 수 있으니 등록 전에 공식 카탈로그에서 확인하세요. 즐겨찾기는 이 브라우저에만 저장됩니다.
+  개인용 비공식 뷰어입니다. 일정과 장소는 바뀔 수 있으니 등록 전에 공식 카탈로그에서 확인하세요. <span id="sync-note">즐겨찾기는 이 브라우저에만 저장됩니다.</span>
 </footer>
 
 <script id="catalog-data" type="application/json">__CATALOG_DATA__</script>
@@ -739,9 +739,84 @@ select.btn { padding-right: 0.5rem; }
   }
   function refilter() { state.shown = PAGE; render(); }
 
+  /* ---------- 기기 간 동기화 ---------- */
+  // Artifact 로 열었을 때만 동작한다. 즐겨찾기를 계정별 비공개 저장소에 두어
+  // 같은 계정으로 연 다른 기기와 맞춘다. 로컬 파일에서는 브라우저 저장만 쓴다.
+  const SYNC_NOTE = {
+    on: '즐겨찾기는 계정에 저장되어 다른 기기에서도 보입니다.',
+    fail: '즐겨찾기를 계정에 저장하지 못했습니다. 지금은 이 브라우저에만 저장됩니다.'
+  };
+  const sync = { doc: null, writing: false, dirty: false };
+  const setSyncNote = kind => { $('sync-note').textContent = SYNC_NOTE[kind]; };
+
+  function adopt(codes) {
+    const next = codes.filter(c => byCode.has(c));
+    if (next.length === fav.size && next.every(c => fav.has(c))) return;
+    fav.clear();
+    next.forEach(c => fav.add(c));
+    store.set('ri26.fav', [...fav]);
+    render();
+  }
+
+  // 한 번에 하나씩만 쓴다. 쓰는 도중 바뀐 내용은 끝난 뒤 한 번 더 쓴다
+  async function push() {
+    if (!sync.doc) return;
+    sync.dirty = true;
+    if (sync.writing) return;
+    sync.writing = true;
+    try {
+      while (sync.dirty) {
+        sync.dirty = false;
+        await sync.doc.set({ codes: [...fav], updatedAt: new Date().toISOString() });
+      }
+      setSyncNote('on');
+    } catch (e) {
+      sync.dirty = false;
+      setSyncNote('fail');
+    } finally {
+      sync.writing = false;
+    }
+  }
+
+  async function startSync() {
+    if (!window.claude || typeof window.claude.use !== 'function') return;
+    try {
+      const [user, db] = await Promise.all([window.claude.use('user'), window.claude.use('db')]);
+      if (!user || !db) return;
+      const uid = await user.id();
+      if (!uid) return;
+      const doc = db.doc('data/users/' + uid + '/favorites');
+      const snap = await doc.get();
+      const saved = snap.exists ? (snap.data() || {}).codes : null;
+      const remote = Array.isArray(saved) ? saved : [];
+      sync.doc = doc;
+      if (!store.get('ri26.synced', false) && fav.size) {
+        // 이 기기에서 처음 연결: 여기서 담아둔 것과 계정에 있던 것을 합친다
+        const before = fav.size;
+        const local = [...fav];
+        adopt([...new Set([...remote, ...local])]);
+        if (fav.size !== remote.length || before !== fav.size) push();
+      } else if (snap.exists) {
+        adopt(remote);
+      } else if (fav.size) {
+        push();
+      }
+      store.set('ri26.synced', true);
+      setSyncNote('on');
+      doc.onSnapshot(s => {
+        if (sync.writing || sync.dirty || s.metadata.hasPendingWrites || !s.exists) return;
+        const codes = (s.data() || {}).codes;
+        if (Array.isArray(codes)) adopt(codes);
+      }, () => setSyncNote('fail'));
+    } catch (e) {
+      setSyncNote('fail');
+    }
+  }
+
   function toggleFav(code) {
     if (fav.has(code)) fav.delete(code); else fav.add(code);
     store.set('ri26.fav', [...fav]);
+    push();
     $('my-n').textContent = fav.size;
     if (state.view === 'my') { renderMy(); return; }
     const on = fav.has(code);
@@ -861,5 +936,6 @@ select.btn { padding-right: 0.5rem; }
     '개, 반복 포함 ' + S.length.toLocaleString() + '회 · 데이터 기준 ' + (m.modified || '').slice(0, 10);
   buildFacets();
   render();
+  startSync();
 })();
 </script>

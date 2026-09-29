@@ -42,5 +42,6 @@ The session data is inserted where `__CATALOG_DATA__` appears in `templates/view
 ## Notes
 
 - Favorites are stored in the browser. If you move or rename `catalog.html`, some browsers will lose them.
+- When the page is published as a Claude Artifact, favorites are also saved to the viewer's account and stay in sync across devices. The local file cannot do this.
 - Times and rooms keep changing until the event. Check the official catalog before you register.
 - `python3 build_viewer.py --fragment PATH` also saves the page body without the `<html>` wrapper, for publishing as a Claude Artifact.
