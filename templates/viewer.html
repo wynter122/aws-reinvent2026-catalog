@@ -332,23 +332,29 @@ body.wide .wrap { max-width: none; }
 .cal-day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .cal-day[aria-pressed="true"] span { color: inherit; }
 .cal-day:disabled { opacity: 0.45; cursor: default; }
-.cal-scroll {
-  overflow: auto; max-height: calc(100vh - var(--bar-h) - 2rem);
-  border: 1px solid var(--line); border-radius: 0.5rem; background: var(--bg);
-}
-.cal { display: grid; grid-template-columns: 4rem repeat(var(--vc), minmax(15rem, 1fr)); }
+/* 시간표 자체에는 스크롤을 두지 않고 페이지와 함께 움직인다. 열은 화면 폭에 맞춰 나눈다 */
+#out { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + var(--bar-h) + 0.5rem); }
+.cal-scroll { overflow: clip; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--bg); }
+.cal { display: grid; grid-template-columns: 3.75rem repeat(var(--vc), minmax(0, 1fr)); }
 .cal-h {
-  position: sticky; top: 0; z-index: 2; display: flex; gap: 0.5rem; align-items: center;
-  padding: 0.5rem 0.75rem; background: var(--fg); color: var(--bg);
-  font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; border-left: 1px solid var(--muted);
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--bar-h)); z-index: 2;
+  display: flex; gap: 0.5rem; align-items: center; min-width: 0;
+  padding: 0.5rem 0.75rem; background: var(--surface-2); color: var(--fg);
+  border-left: 1px solid var(--line);
+  font-size: 0.8125rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .cal-h i { width: 0.75rem; height: 0.75rem; border-radius: 0.1875rem; flex: none; }
-.cal-h.none { font-style: italic; color: var(--line); }
-.cal-corner { left: 0; z-index: 3; border-left: none; }
+.cal-h.none { font-style: italic; color: var(--muted); }
+.cal-corner { border-left: none; color: var(--muted); font-weight: 500; }
 .cal-t {
-  position: sticky; left: 0; z-index: 1; padding: 0.5rem 0.625rem;
-  background: var(--surface-2); border-top: 1px solid var(--line);
-  font: 500 0.875rem var(--font-data); font-variant-numeric: tabular-nums;
+  padding: 0.5rem 0.625rem; border-top: 1px solid var(--line);
+  font: 500 0.8125rem var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+@media (max-width: 56rem) {
+  /* 좁은 화면에서만 가로로 밀어 본다 */
+  .cal-scroll { overflow-x: auto; }
+  .cal { grid-template-columns: 3.25rem repeat(var(--vc), minmax(12rem, 1fr)); }
+  .cal-h { top: 0; }
 }
 .cal-cell { min-width: 0; display: flex; flex-direction: column; gap: 0.375rem; padding: 0.375rem; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .cal-card {
@@ -358,10 +364,13 @@ body.wide .wrap { max-width: none; }
 .cal-card:hover { border-color: var(--accent); }
 .cal-card.fav { border-color: var(--star); box-shadow: inset 3px 0 0 var(--star); }
 .cal-card.cand { border-color: var(--accent); border-style: dashed; box-shadow: inset 3px 0 0 var(--accent); }
-.cal-top { display: flex; gap: 0.375rem; align-items: center; }
-.cal-top .code { font-size: 0.75rem; white-space: nowrap; }
-.cal-when { font: 400 0.6875rem var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cal-top .marks { margin-left: auto; }
+/* 좁은 카드에서는 시각이 먼저 줄어들고, 버튼은 항상 카드 안에 남는다 */
+.cal-top { display: flex; gap: 0.375rem; align-items: center; min-width: 0; }
+.cal-top .code { font-size: 0.75rem; white-space: nowrap; flex: none; }
+.cal-top .lv { flex: none; }
+.cal-when { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 400 0.6875rem var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-meta .cal-when { color: var(--fg); }
+.cal-top .marks { margin-left: auto; flex: none; }
 .cal-top .marks button { padding: 0.125rem; }
 .cal-top .marks svg { width: 1.125rem; height: 1.125rem; }
 .cal-title {
@@ -382,6 +391,22 @@ body.wide .wrap { max-width: none; }
 .dlg-body .list { border-top: none; }
 .dlg-body .row { border-bottom: none; }
 .dlg-body .row.open { background: none; margin-inline: 0; padding-inline: 0; }
+
+/* 시간표를 내려 보면 날짜·보기 방식이 상단 바의 검색창 옆으로 올라온다 */
+.bar-extra { display: none; }
+body.stuck .bar-in { flex-wrap: nowrap; }
+body.stuck .search { flex: 0 1 16rem; }
+body.stuck .bar-extra { display: flex; flex: 1 1 0; min-width: 0; align-items: center; gap: 0.75rem; }
+.bx-count { flex: none; margin: 0; color: var(--muted); font-size: 0.8125rem; white-space: nowrap; }
+.bx-count b { color: var(--fg); font: 500 0.875rem var(--font-data); }
+.bx-days { flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.bx-days::-webkit-scrollbar { display: none; }
+.bx-days .cal-day { flex: none; padding: 0.3125rem 0.625rem; white-space: nowrap; font-size: 0.875rem; }
+.bar-extra .seg { flex: none; margin-left: auto; }
+@media (max-width: 56rem) {
+  .bx-count { display: none; }
+  body.stuck .search { flex-basis: 9rem; }
+}
 
 .copybox { width: 100%; min-height: 8rem; font: 400 0.8125rem var(--font-data); background: var(--surface); border: 1px solid var(--line); border-radius: 0.375rem; padding: 0.5rem; }
 
@@ -414,7 +439,7 @@ body.wide .wrap { max-width: none; }
   <p id="meta-date"></p>
 </header>
 
-<div class="bar">
+<div class="bar" id="bar">
   <div class="wrap bar-in">
     <div class="tabs" role="tablist" aria-label="보기 전환">
       <button class="tab" role="tab" id="tab-all" data-view="all" aria-selected="true">전체 세션</button>
@@ -423,6 +448,7 @@ body.wide .wrap { max-width: none; }
     <div class="search">
       <input id="q" type="search" placeholder="제목, 코드, 발표자, 서비스로 검색" aria-label="세션 검색" autocomplete="off">
     </div>
+    <div class="bar-extra" id="bar-extra"></div>
     <select class="btn" id="sort" aria-label="정렬">
       <option value="time">시간순</option>
       <option value="code">코드순</option>
@@ -806,10 +832,10 @@ body.wide .wrap { max-width: none; }
     const room = s.r ? s.r.split(' | ').slice(1).join(' | ') : '';
     const who = (s.sp || []).map(p => p.n).filter(Boolean).join(', ');
     return '<article class="cal-card' + (fav.has(s.c) ? ' fav' : cand.has(s.c) ? ' cand' : '') + '">' +
-      '<div class="cal-top"><span class="code">' + esc(s.c) + '</span><span class="cal-when">' + s.s + '–' + s.e + '</span>' +
+      '<div class="cal-top"><span class="code">' + esc(s.c) + '</span>' +
       (s.l ? '<span class="lv lv' + s.l[0] + '" title="' + esc(LEVELS[s.l] || s.l) + '">' + esc(s.l) + '</span>' : '') + marks(s) + '</div>' +
       '<button class="cal-title" data-cal="' + esc(s.c) + '" aria-haspopup="dialog">' + esc(titleOf(s)) + '</button>' +
-      '<div class="cal-meta">' + esc([s.y, room].filter(Boolean).join(' · ')) + '</div>' +
+      '<div class="cal-meta"><span class="cal-when">' + s.s + '–' + s.e + '</span> · ' + esc([s.y, room].filter(Boolean).join(' · ')) + '</div>' +
       (who ? '<div class="cal-meta">' + esc(who) + '</div>' : '') + '</article>';
   }
 
@@ -821,6 +847,7 @@ body.wide .wrap { max-width: none; }
       byDay.get(k).push(s);
     }
     if (!out.length) {
+      $('bar-extra').innerHTML = '';
       $('out').innerHTML = '<div class="empty"><b>조건에 맞는 세션이 없습니다</b>검색어를 줄이거나 필터를 몇 개 해제해 보세요.</div>';
       return;
     }
@@ -828,13 +855,15 @@ body.wide .wrap { max-width: none; }
     // 고른 날에 남은 세션이 없으면 결과가 있는 첫날을 보여 주되, 고른 날은 기억해 둔다
     const day = byDay.has(state.opts.calDay) ? state.opts.calDay : keys.find(k => byDay.has(k));
     const items = byDay.get(day);
-    const html = ['<div class="my"><div class="cal-days" role="group" aria-label="날짜 선택">'];
-    keys.forEach((k, i) => {
+    const dayBtns = short => keys.map((k, i) => {
       const n = (byDay.get(k) || []).length;
-      html.push('<button class="cal-day" data-cal-day="' + k + '" aria-pressed="' + (k === day) + '"' + (n ? '' : ' disabled') + '>' +
-        (k ? (i + 1) + '일 차 · ' + dayLabel(k) : '일정 미정') + '<span>' + n.toLocaleString() + '</span></button>');
-    });
-    html.push('</div>');
+      return '<button class="cal-day" data-cal-day="' + k + '" aria-pressed="' + (k === day) + '"' + (n ? '' : ' disabled') + '>' +
+        (k ? (short ? '' : (i + 1) + '일 차 · ') + dayLabel(k) : '일정 미정') + '<span>' + n.toLocaleString() + '</span></button>';
+    }).join('');
+    $('bar-extra').innerHTML = '<p class="bx-count"><b>' + out.length.toLocaleString() + '</b>회 진행</p>' +
+      '<div class="cal-days bx-days" role="group" aria-label="날짜 선택">' + dayBtns(true) + '</div>' +
+      '<div class="seg" role="group" aria-label="전체 세션 보기 방식"><button data-mode="grid" aria-pressed="true">시간표</button><button data-mode="list" aria-pressed="false">목록</button></div>';
+    const html = ['<div class="my"><div class="cal-days" id="cal-days" role="group" aria-label="날짜 선택">' + dayBtns(false) + '</div>'];
     if (!day) {
       html.push('<div class="list">' + items.map(s => rowHTML(s)).join('') + '</div></div>');
       $('out').innerHTML = html.join('');
@@ -1351,6 +1380,7 @@ body.wide .wrap { max-width: none; }
     $('copybox').hidden = true;
     if (my) { $('more').hidden = true; renderMy(); }
     else { $('btn-copy').hidden = true; renderAll(); }
+    if (!calOn()) $('bar-extra').innerHTML = '';
     updateExport();
     queueFitRail();
   }
@@ -1519,8 +1549,11 @@ body.wide .wrap { max-width: none; }
       state.opts.calDay = t.getAttribute('data-cal-day');
       store.set('ri26.opts', state.opts);
       renderAll();
+      // 시간표 안으로 내려와 있었다면 고른 날의 첫 시간대로 올린다
       const box = $('out').querySelector('.cal-scroll');
-      if (box) box.scrollTop = 0;
+      const barB = $('bar').getBoundingClientRect().bottom;
+      if (box && box.getBoundingClientRect().top < barB) window.scrollBy(0, box.getBoundingClientRect().top - barB);
+      updateStuck();
       return;
     }
     if (t.hasAttribute('data-info')) {
@@ -1651,9 +1684,20 @@ body.wide .wrap { max-width: none; }
     const room = window.innerHeight - rail.getBoundingClientRect().top - 16;
     rail.style.setProperty('--rail-h', Math.max(room, 160) + 'px');
   }
-  const queueFitRail = () => { if (!railFrame) railFrame = requestAnimationFrame(fitRail); };
+  // 시간표의 날짜 줄이 상단 바 밑으로 사라지면 바에 사본을 띄운다
+  function updateStuck() {
+    const days = calOn() && $('cal-days');
+    const on = !!days && $('bar-extra').firstChild !== null &&
+      days.getBoundingClientRect().bottom <= $('bar').getBoundingClientRect().bottom;
+    document.body.classList.toggle('stuck', on);
+  }
+  const queueFitRail = () => { if (!railFrame) railFrame = requestAnimationFrame(() => { updateStuck(); fitRail(); }); };
   window.addEventListener('scroll', queueFitRail, { passive: true });
   window.addEventListener('resize', queueFitRail);
+  // 고정 바의 실제 높이를 레일과 시간표 머리글의 기준으로 쓴다
+  const setBarH = () => document.documentElement.style.setProperty('--bar-h', $('bar').offsetHeight + 'px');
+  if ('ResizeObserver' in window) new ResizeObserver(setBarH).observe($('bar'));
+  setBarH();
 
   window.addEventListener('hashchange', () => {
     const v = location.hash === '#my' ? 'my' : 'all';
