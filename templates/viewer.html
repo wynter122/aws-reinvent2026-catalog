@@ -171,6 +171,7 @@ select.btn { padding-right: 0.5rem; }
 .r-title { all: unset; cursor: pointer; display: block; overflow-wrap: anywhere; }
 .r-title:hover { color: var(--accent); }
 .r-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.r-en { display: block; margin-top: 0.125rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
 .r-meta { color: var(--muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
 .star {
   align-self: start; border: none; background: none; padding: 0.25rem; border-radius: 0.25rem;
@@ -182,6 +183,9 @@ select.btn { padding-right: 0.5rem; }
 
 .r-detail { display: flex; flex-direction: column; gap: 0.875rem; padding-top: 0.625rem; max-width: 46rem; }
 .r-detail p { margin: 0; }
+.abs { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
+.abs-swap { border: none; background: none; padding: 0; border-radius: 0.25rem; font-size: 0.8125rem; color: var(--accent); }
+.abs-swap:hover { text-decoration: underline; }
 .dl { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.375rem 0.75rem; margin: 0; font-size: 0.875rem; }
 .dl dt { color: var(--muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; padding-top: 0.125rem; }
 .dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -329,6 +333,7 @@ select.btn { padding-right: 0.5rem; }
 <div class="wrap cols" id="cols">
   <aside class="rail" id="rail" aria-label="필터">
     <div class="toggles">
+      <label id="opt-ko-wrap" hidden><input type="checkbox" id="opt-ko" checked><span>제목·설명 한국어로 보기</span></label>
       <label><input type="checkbox" id="opt-group" checked><span>반복 세션은 하나로 묶기</span></label>
       <label><input type="checkbox" id="opt-nospon"><span>스폰서 세션 숨기기</span></label>
       <label><input type="checkbox" id="opt-nolap"><span>노트북 필요 세션 숨기기</span></label>
@@ -365,7 +370,7 @@ select.btn { padding-right: 0.5rem; }
 </div>
 
 <footer class="wrap foot">
-  개인용 비공식 뷰어입니다. 일정과 장소는 바뀔 수 있으니 등록 전에 공식 카탈로그에서 확인하세요. <span id="sync-note">즐겨찾기는 이 브라우저에만 저장됩니다.</span>
+  개인용 비공식 뷰어입니다. 일정과 장소는 바뀔 수 있으니 등록 전에 공식 카탈로그에서 확인하세요. <span id="ko-note" hidden>제목과 설명의 한국어는 Claude가 번역한 것이라 틀릴 수 있습니다.</span> <span id="sync-note">즐겨찾기는 이 브라우저에만 저장됩니다.</span>
 </footer>
 
 <script id="catalog-data" type="application/json">__CATALOG_DATA__</script>
@@ -426,6 +431,9 @@ select.btn { padding-right: 0.5rem; }
     return s.sm < 720 ? TOD[0] : s.sm < 1020 ? TOD[1] : TOD[2];
   }
   const timeKey = s => (s.d || '9999') + ' ' + (s.s || '99:99') + ' ' + s.c;
+  // 번역이 있고 한국어 보기가 켜져 있으면 한국어 제목을 앞세운다
+  const koOn = s => state.opts.ko && !!s.tk;
+  const titleOf = s => koOn(s) ? s.tk : s.t;
 
   const FACETS = [
     { k: 'd', label: '요일', get: s => [s.d || NONE], fmt: v => v === NONE ? '일정 미정' : dayLabel(v), order: 'key', open: true },
@@ -452,7 +460,7 @@ select.btn { padding-right: 0.5rem; }
     groups.get(s.g).push(s);
     s._f = {};
     for (const f of FACETS) s._f[f.k] = f.get(s);
-    s._h = [s.c, s.t, s.a, s.y, s.r, (s.sp || []).map(p => (p.n || '') + ' ' + (p.o || '')).join(' '),
+    s._h = [s.c, s.t, s.tk, s.a, s.ak, s.y, s.r, (s.sp || []).map(p => (p.n || '') + ' ' + (p.o || '')).join(' '),
       (s.sv || []).join(' '), (s.tp || []).join(' '), (s.ai || []).join(' ')].join(' ').toLowerCase();
   }
   for (const list of groups.values()) list.sort((a, b) => timeKey(a) < timeKey(b) ? -1 : 1);
@@ -477,8 +485,10 @@ select.btn { padding-right: 0.5rem; }
     q: '',
     sort: 'time',
     sel: Object.fromEntries(FACETS.map(f => [f.k, new Set()])),
-    opts: Object.assign({ group: true, noSpon: false, noLap: false, myMode: 'grid', info: {} }, store.get('ri26.opts', {})),
+    opts: Object.assign({ ko: true, group: true, noSpon: false, noLap: false, myMode: 'grid', info: {} }, store.get('ri26.opts', {})),
     open: new Set(),
+    orig: new Set(), // 번역 대신 원문 설명을 보고 있는 세션
+
     shown: PAGE,
     rows: []
   };
@@ -570,7 +580,7 @@ select.btn { padding-right: 0.5rem; }
   }
 
   function sortRows(list) {
-    const key = state.sort === 'code' ? (s => s.c) : state.sort === 'title' ? (s => s.t.toLowerCase() + ' ' + timeKey(s)) : timeKey;
+    const key = state.sort === 'code' ? (s => s.c) : state.sort === 'title' ? (s => titleOf(s).toLowerCase() + ' ' + timeKey(s)) : timeKey;
     return list.map(s => [key(s), s]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(p => p[1]);
   }
 
@@ -581,6 +591,14 @@ select.btn { padding-right: 0.5rem; }
   }
   function whenText(s) {
     return s.d ? dayLabel(s.d) + ' ' + s.s + '–' + s.e : '일정 미정';
+  }
+
+  function abstractHTML(s) {
+    if (!s.a) return '';
+    if (!(state.opts.ko && s.ak)) return '<p>' + esc(s.a) + '</p>';
+    const orig = state.orig.has(s.c);
+    return '<div class="abs"><p' + (orig ? ' lang="en"' : '') + '>' + esc(orig ? s.a : s.ak) + '</p>' +
+      '<button class="abs-swap" data-orig="' + esc(s.c) + '">' + (orig ? '번역 보기' : '원문 보기') + '</button></div>';
   }
 
   function detailHTML(s) {
@@ -606,7 +624,7 @@ select.btn { padding-right: 0.5rem; }
         (FORMAT_INFO[v] ? ' <span>' + esc(FORMAT_INFO[v]) + '</span>' : '') + '</span>').join('')]);
     }
     rows.push(['공식 페이지', '<a href="' + esc(s.u) + '" target="_blank" rel="noopener">카탈로그에서 ' + esc(s.c) + ' 열기</a>']);
-    return '<div class="r-detail"><p>' + esc(s.a || '') + '</p><dl class="dl">' +
+    return '<div class="r-detail">' + abstractHTML(s) + '<dl class="dl">' +
       rows.map(r => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('') + '</dl></div>';
   }
 
@@ -627,7 +645,8 @@ select.btn { padding-right: 0.5rem; }
     return '<article class="row' + (open ? ' open' : '') + '" data-c="' + esc(s.c) + '">' +
       '<div class="r-time">' + time + '</div>' +
       '<div class="r-main"><div class="r-top">' + chips.join('') + '</div>' +
-      '<h3><button class="r-title" data-open="' + esc(s.c) + '" aria-expanded="' + open + '">' + esc(s.t) + '</button></h3>' +
+      '<h3><button class="r-title" data-open="' + esc(s.c) + '" aria-expanded="' + open + '">' +
+      (koOn(s) ? esc(s.tk) + '<span class="r-en" lang="en">' + esc(s.t) + '</span>' : esc(s.t)) + '</button></h3>' +
       (meta ? '<div class="r-meta">' + esc(meta) + '</div>' : '') +
       (open ? detailHTML(s) : '') + '</div>' + starBtn(s) + '</article>';
   }
@@ -761,9 +780,9 @@ select.btn { padding-right: 0.5rem; }
           if (state.pick === s.c) cls.push('on');
           const room = s.r ? s.r.split(' | ').slice(1).pop() || s.v : '';
           html.push('<button class="' + cls.join(' ') + '" data-pick="' + esc(s.c) + '" style="top:' + px(s.sm) + 'px;height:' + (len * HOUR_PX / 60) +
-            'px;left:' + (L.lane / L.n * 100) + '%;width:' + (100 / L.n) + '%" aria-label="' + esc(s.c + ' ' + whenText(s) + ' ' + s.t) + '">' +
+            'px;left:' + (L.lane / L.n * 100) + '%;width:' + (100 / L.n) + '%" aria-label="' + esc(s.c + ' ' + whenText(s) + ' ' + titleOf(s)) + '">' +
             '<span class="tt-code">' + esc(s.c) + '</span><span class="tt-time">' + s.s + '–' + s.e + '</span>' +
-            '<span class="tt-title">' + esc(s.t) + '</span><span class="tt-room">' + esc(room) + '</span></button>');
+            '<span class="tt-title">' + esc(titleOf(s)) + '</span><span class="tt-room">' + esc(room) + '</span></button>');
         }
         html.push('</div>');
       }
@@ -811,7 +830,7 @@ select.btn { padding-right: 0.5rem; }
   }
 
   function scheduleText() {
-    return mySchedule().list.map(s => [whenText(s), s.c, s.t, s.r ? '@ ' + s.r : ''].filter(Boolean).join('  ')).join('\n');
+    return mySchedule().list.map(s => [whenText(s), s.c, titleOf(s), s.r ? '@ ' + s.r : ''].filter(Boolean).join('  ')).join('\n');
   }
 
   /* ---------- 내보내기 ---------- */
@@ -823,6 +842,7 @@ select.btn { padding-right: 0.5rem; }
   const EXPORT_COLS = [
     ['코드', s => s.c, 14],
     ['제목', s => s.t, 60],
+    ['제목(번역)', s => s.tk || '', 60],
     ['유형', s => s.y, 18],
     ['레벨', s => num(s.l), 8],
     ['날짜', s => s.d, 12],
@@ -844,6 +864,7 @@ select.btn { padding-right: 0.5rem; }
     ['스폰서', s => s.spon ? 'Y' : '', 8],
     ['전체 진행 시간', s => slotsOf(s).map(x => x.c + ' ' + whenText(x) + (x.v ? ' @ ' + x.v : '')).join('; '), 50],
     ['설명', s => s.a, 80],
+    ['설명(번역)', s => s.ak || '', 80],
     ['공식 페이지', s => s.u, 50]
   ];
 
@@ -873,7 +894,7 @@ select.btn { padding-right: 0.5rem; }
       filters,
       count: list.length,
       sessions: list.map(s => ({
-        code: s.c, group: s.g, title: s.t, type: s.y, level: s.l || null, track: s.tr || null,
+        code: s.c, group: s.g, title: s.t, titleKo: s.tk || null, type: s.y, level: s.l || null, track: s.tr || null,
         date: s.d || null, start: s.s || null, end: s.e || null, minutes: s.len || null,
         venue: s.v || null, room: s.r || null, capacity: s.cap && s.cap !== '0' ? num(s.cap) : null,
         speakers: (s.sp || []).map(p => ({ name: p.n || '', title: p.j || '', company: p.o || '' })),
@@ -881,7 +902,7 @@ select.btn { padding-right: 0.5rem; }
         roles: s.ro || [], industries: s.in || [], features: s.ft || [],
         laptopRequired: !!s.lap, sponsored: !!s.spon,
         slots: slotsOf(s).map(slot),
-        abstract: s.a || '', url: s.u
+        abstract: s.a || '', abstractKo: s.ak || null, url: s.u
       }))
     }, null, 2);
   }
@@ -1139,14 +1160,24 @@ select.btn { padding-right: 0.5rem; }
     });
   }
 
-  function toggleOpen(code) {
-    if (state.open.has(code)) state.open.delete(code); else state.open.add(code);
+  // 세션 한 줄만 다시 그리고, 누른 버튼으로 포커스를 되돌린다
+  function repaintRow(code, attr) {
     if (state.view === 'my') { renderMy(); return; }
     const el = $('out').querySelector('.row[data-c="' + CSS.escape(code) + '"]');
     const r = state.rows.find(x => x.s.c === code);
     if (el && r) el.outerHTML = rowHTML(r.s, r.x);
-    const btn = $('out').querySelector('[data-open="' + CSS.escape(code) + '"]');
+    const btn = $('out').querySelector('[' + attr + '="' + CSS.escape(code) + '"]');
     if (btn) btn.focus();
+  }
+
+  function toggleOpen(code) {
+    if (state.open.has(code)) state.open.delete(code); else state.open.add(code);
+    repaintRow(code, 'data-open');
+  }
+
+  function toggleOrig(code) {
+    if (state.orig.has(code)) state.orig.delete(code); else state.orig.add(code);
+    repaintRow(code, 'data-orig');
   }
 
   function setView(v) {
@@ -1159,7 +1190,7 @@ select.btn { padding-right: 0.5rem; }
   /* ---------- 이벤트 ---------- */
   document.addEventListener('click', e => {
     if (!e.target.closest('#export summary')) $('export').open = false;
-    const t = e.target.closest('[data-star],[data-open],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],.pick');
+    const t = e.target.closest('[data-star],[data-open],[data-orig],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],.pick');
     if (!t) return;
     if (t.hasAttribute('data-info')) {
       const k = t.getAttribute('data-info');
@@ -1195,6 +1226,7 @@ select.btn { padding-right: 0.5rem; }
     }
     if (t.hasAttribute('data-star')) toggleFav(t.getAttribute('data-star'));
     else if (t.hasAttribute('data-open')) toggleOpen(t.getAttribute('data-open'));
+    else if (t.hasAttribute('data-orig')) toggleOrig(t.getAttribute('data-orig'));
     else if (t.hasAttribute('data-view')) setView(t.getAttribute('data-view'));
     else if (t.hasAttribute('data-clear')) {
       for (const f of FACETS) state.sel[f.k].clear();
@@ -1226,7 +1258,7 @@ select.btn { padding-right: 0.5rem; }
   });
   $('sort').addEventListener('change', e => { state.sort = e.target.value; refilter(); });
 
-  [['opt-group', 'group'], ['opt-nospon', 'noSpon'], ['opt-nolap', 'noLap']].forEach(([id, k]) => {
+  [['opt-ko', 'ko'], ['opt-group', 'group'], ['opt-nospon', 'noSpon'], ['opt-nolap', 'noLap']].forEach(([id, k]) => {
     $(id).checked = !!state.opts[k];
     $(id).addEventListener('change', e => {
       state.opts[k] = e.target.checked;
@@ -1282,6 +1314,7 @@ select.btn { padding-right: 0.5rem; }
   const m = DATA.meta;
   $('meta-line').textContent = '11월 30일(월) ~ 12월 4일(금), 라스베이거스';
   $('meta-date').textContent = '데이터 기준 ' + (m.modified || '').slice(0, 10);
+  $('opt-ko-wrap').hidden = $('ko-note').hidden = !m.ko;
   buildFacets();
   render();
   fitRail();

@@ -15,20 +15,42 @@ open catalog.html          # 3. Open it in a browser
 
 If you only changed the page and don't need fresh data, run step 2 alone.
 
+## Korean translations
+
+The page shows each session's title in Korean with the English original underneath, and the description in Korean with a button to switch to the original. Translations live in `translations/ko.json`, keyed by a hash of the English text. When the catalog is refreshed, only the text that changed needs translating again.
+
+`translate_catalog.py` only manages the files; it does not translate. After fetching new data:
+
+```bash
+python3 translate_catalog.py status   # How much is translated and how much is left
+python3 translate_catalog.py export   # Write untranslated text to data/translate/todo/NNN.json
+# Translate each todo file into data/translate/done/NNN.json as {"key": "Korean", ...},
+# following translations/STYLE.md. Claude Code can do this if you point it at the two folders.
+python3 translate_catalog.py import   # Merge done files into translations/ko.json
+python3 build_viewer.py
+```
+
+`python3 translate_catalog.py prune` removes translations for text that is no longer in the catalog. Sessions without a translation are shown in English.
+
 ## Layout
 
 ```
 .
 ├── fetch_catalog.py        Fetcher: catalog API → data/
-├── build_viewer.py         Builder: data/ + templates/ → catalog.html
+├── translate_catalog.py    Translation queue: data/ ⇄ translations/
+├── build_viewer.py         Builder: data/ + translations/ + templates/ → catalog.html
 ├── templates/
 │   └── viewer.html         Page template (HTML, CSS, JS)
+├── translations/
+│   ├── ko.json             Korean titles and descriptions, keyed by source-text hash
+│   └── STYLE.md            Translation style guide and glossary
 ├── data/
-│   └── sessions_raw.json   Raw API response (about 21MB). Not in git
+│   ├── sessions_raw.json   Raw API response (about 21MB). Not in git
+│   └── translate/          todo/ and done/ work files. Not in git
 └── catalog.html            The output. Double-click to open. Not in git
 ```
 
-`data/` and `catalog.html` are kept out of git because the scripts can recreate them. After a fresh clone, run steps 1 and 2 first.
+`data/` and `catalog.html` are kept out of git because the scripts can recreate them. `translations/` is kept in git because recreating it means translating everything again. After a fresh clone, run steps 1 and 2 first.
 
 ## Where to make changes
 
@@ -36,6 +58,7 @@ If you only changed the page and don't need fresh data, run step 2 alone.
 |---|---|
 | Page appearance, filter options, timetable behavior | `templates/viewer.html` |
 | Which fields the page receives | `slim_session` in `build_viewer.py` |
+| Translation wording and glossary | `translations/STYLE.md`, then re-translate the affected entries |
 
 The session data is inserted where `__CATALOG_DATA__` appears in `templates/viewer.html`. Do not remove that string.
 

@@ -3,12 +3,14 @@
 
 fetch_catalog.py 가 만든 data/sessions_raw.json 에서 화면에 필요한 필드만 추려
 templates/viewer.html 에 끼워 넣고, 단일 파일 catalog.html 을 만든다.
+translations/ko.json 에 번역이 있으면 제목과 설명의 한국어도 함께 넣는다.
 표준 라이브러리만 사용하므로 `python3 build_viewer.py` 로 실행.
 
 옵션:
   --fragment PATH  <html>/<head> 래퍼 없는 본문만 따로 저장 (Artifact 게시용)
 """
 import argparse
+import hashlib
 import html
 import json
 import re
@@ -22,6 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent
 RAW_PATH = BASE_DIR / "data" / "sessions_raw.json"
 TEMPLATE_PATH = BASE_DIR / "templates" / "viewer.html"
 OUT_PATH = BASE_DIR / "catalog.html"
+KO_PATH = BASE_DIR / "translations" / "ko.json"
 DATA_PLACEHOLDER = "__CATALOG_DATA__"
 LOCAL_HEAD = (
     '<!doctype html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n'
@@ -54,6 +57,17 @@ def attribute_values(session, name):
 
 def clean_text(text):
     return " ".join(html.unescape(TAG.sub(" ", text or "")).split())
+
+
+def text_key(text):
+    """번역 캐시의 키. 원문이 바뀌면 키도 바뀌어 그 문장만 다시 번역된다."""
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+
+
+def load_translations():
+    if not KO_PATH.exists():
+        return {}
+    return json.loads(KO_PATH.read_text(encoding="utf-8"))
 
 
 def slim_speaker(p):
@@ -112,10 +126,17 @@ def main():
 
     raw = json.loads(RAW_PATH.read_text(encoding="utf-8"))
     sessions = sorted((slim_session(s) for s in raw), key=lambda r: r["c"])
+    ko = load_translations()
+    for row in sessions:
+        for src, dst in (("t", "tk"), ("a", "ak")):
+            if row.get(src) and ko.get(text_key(row[src])):
+                row[dst] = ko[text_key(row[src])]
+    translated = sum(1 for row in sessions if "tk" in row)
     payload = {
         "meta": {
             "event": "re:Invent 2026",
             "count": len(sessions),
+            "ko": translated,
             "modified": max((s.get("modified", "") for s in raw), default=""),
             "built": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
@@ -131,7 +152,7 @@ def main():
 
     out = OUT_PATH
     out.write_text(LOCAL_HEAD + page, encoding="utf-8")
-    print(f"완료: 세션 {len(sessions)}개 -> {out} ({out.stat().st_size / 1e6:.1f}MB)")
+    print(f"완료: 세션 {len(sessions)}개 (번역 {translated}개) -> {out} ({out.stat().st_size / 1e6:.1f}MB)")
     if args.fragment:
         args.fragment.write_text(page, encoding="utf-8")
         print(f"본문만 저장: {args.fragment}")
