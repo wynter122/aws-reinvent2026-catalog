@@ -281,6 +281,67 @@ select.btn { padding-right: 0.5rem; }
 .my { display: flex; flex-direction: column; gap: 0.75rem; }
 .my .day-h { margin-top: 0.75rem; }
 
+/* 전체 세션 시간표: 하루씩, 건물별 열 × 30분 단위 시작 시각 행 */
+body.wide .wrap { max-width: none; }
+.cal-days { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.cal-day {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 0.375rem;
+  padding: 0.3125rem 0.75rem; font-weight: 500;
+}
+.cal-day span { font: 400 0.75rem var(--font-data); color: var(--muted); margin-left: 0.375rem; }
+.cal-day:hover:not(:disabled) { border-color: var(--accent); }
+.cal-day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.cal-day[aria-pressed="true"] span { color: inherit; }
+.cal-day:disabled { opacity: 0.45; cursor: default; }
+.cal-scroll {
+  overflow: auto; max-height: calc(100vh - var(--bar-h) - 2rem);
+  border: 1px solid var(--line); border-radius: 0.5rem; background: var(--bg);
+}
+.cal { display: grid; grid-template-columns: 4rem repeat(var(--vc), minmax(15rem, 1fr)); }
+.cal-h {
+  position: sticky; top: 0; z-index: 2; display: flex; gap: 0.5rem; align-items: center;
+  padding: 0.5rem 0.75rem; background: var(--fg); color: var(--bg);
+  font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; border-left: 1px solid var(--muted);
+}
+.cal-h i { width: 0.75rem; height: 0.75rem; border-radius: 0.1875rem; flex: none; }
+.cal-h.none { font-style: italic; color: var(--line); }
+.cal-corner { left: 0; z-index: 3; border-left: none; }
+.cal-t {
+  position: sticky; left: 0; z-index: 1; padding: 0.5rem 0.625rem;
+  background: var(--surface-2); border-top: 1px solid var(--line);
+  font: 500 0.875rem var(--font-data); font-variant-numeric: tabular-nums;
+}
+.cal-cell { min-width: 0; display: flex; flex-direction: column; gap: 0.375rem; padding: 0.375rem; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.cal-card {
+  min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; padding: 0.375rem 0.5rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 0.375rem; font-size: 0.75rem;
+}
+.cal-card:hover { border-color: var(--accent); }
+.cal-card.fav { border-color: var(--star); box-shadow: inset 3px 0 0 var(--star); }
+.cal-top { display: flex; gap: 0.375rem; align-items: center; }
+.cal-top .code { font-size: 0.75rem; white-space: nowrap; }
+.cal-when { font: 400 0.6875rem var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-top .star { margin-left: auto; padding: 0.125rem; }
+.cal-top .star svg { width: 1.125rem; height: 1.125rem; }
+.cal-title {
+  all: unset; cursor: pointer; font-size: 0.8125rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+.cal-title:hover { color: var(--accent); }
+.cal-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cal-meta { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.dlg {
+  width: min(46rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 0;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 0.5rem;
+}
+.dlg::backdrop { background: rgb(0 0 0 / 0.45); }
+.dlg-bar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; padding: 0.625rem 0.75rem 0; background: var(--bg); }
+.dlg-body { padding: 0 1.25rem 1rem; }
+.dlg-body .list { border-top: none; }
+.dlg-body .row { border-bottom: none; }
+.dlg-body .row.open { background: none; margin-inline: 0; padding-inline: 0; }
+
 .copybox { width: 100%; min-height: 8rem; font: 400 0.8125rem var(--font-data); background: var(--surface); border: 1px solid var(--line); border-radius: 0.375rem; padding: 0.5rem; }
 
 .foot { color: var(--muted); font-size: 0.75rem; padding-block: 0 2rem; }
@@ -345,7 +406,7 @@ select.btn { padding-right: 0.5rem; }
     <div class="status">
       <p class="count" id="count" aria-live="polite"></p>
       <div class="status-r">
-        <div class="seg" id="seg" role="group" aria-label="내 일정 보기 방식" hidden>
+        <div class="seg" id="seg" role="group" aria-label="보기 방식" hidden>
           <button id="mode-grid" data-mode="grid" aria-pressed="true">시간표</button>
           <button id="mode-list" data-mode="list" aria-pressed="false">목록</button>
         </div>
@@ -368,6 +429,11 @@ select.btn { padding-right: 0.5rem; }
     <button class="btn more" id="more" hidden>더 보기</button>
   </main>
 </div>
+
+<dialog class="dlg" id="dlg" aria-label="세션 상세">
+  <div class="dlg-bar"><button class="btn" id="dlg-x">닫기</button></div>
+  <div class="dlg-body" id="dlg-body"></div>
+</dialog>
 
 <footer class="wrap foot">
   개인용 비공식 뷰어입니다. 일정과 장소는 바뀔 수 있으니 등록 전에 공식 카탈로그에서 확인하세요. <span id="ko-note" hidden>제목과 설명의 한국어는 Claude가 번역한 것이라 틀릴 수 있습니다.</span> <span id="sync-note">즐겨찾기는 이 브라우저에만 저장됩니다.</span>
@@ -485,9 +551,10 @@ select.btn { padding-right: 0.5rem; }
     q: '',
     sort: 'time',
     sel: Object.fromEntries(FACETS.map(f => [f.k, new Set()])),
-    opts: Object.assign({ ko: true, group: true, noSpon: false, noLap: false, myMode: 'grid', info: {} }, store.get('ri26.opts', {})),
+    opts: Object.assign({ ko: true, group: true, noSpon: false, noLap: false, myMode: 'grid', allMode: 'list', calDay: null, info: {} }, store.get('ri26.opts', {})),
     open: new Set(),
     orig: new Set(), // 번역 대신 원문 설명을 보고 있는 세션
+    calPick: null, // 전체 시간표에서 상세 창으로 연 세션
 
     shown: PAGE,
     rows: []
@@ -666,10 +733,105 @@ select.btn { padding-right: 0.5rem; }
       rows = [...first.values()];
     }
     state.rows = rows;
+    setSeg(calOn());
+    if (calOn()) {
+      // 시간표는 시각마다 놓아야 하므로 반복 세션도 회차별로 모두 보인다
+      $('count').innerHTML = '<b>' + out.length.toLocaleString() + '</b>회 진행';
+      $('more').hidden = true;
+      paintCal(out);
+      return;
+    }
     $('count').innerHTML = state.opts.group
       ? '<b>' + rows.length.toLocaleString() + '</b>개 세션 <span>(반복 포함 ' + out.length.toLocaleString() + '회)</span>'
       : '<b>' + out.length.toLocaleString() + '</b>개 세션';
     paintRows();
+  }
+
+  /* ---------- 전체 세션 시간표 ---------- */
+  const calOn = () => state.view === 'all' && state.opts.allMode === 'grid';
+  const SLOT_MIN = 30;
+  const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+  function calCard(s) {
+    const room = s.r ? s.r.split(' | ').slice(1).join(' | ') : '';
+    const who = (s.sp || []).map(p => p.n).filter(Boolean).join(', ');
+    return '<article class="cal-card' + (fav.has(s.c) ? ' fav' : '') + '">' +
+      '<div class="cal-top"><span class="code">' + esc(s.c) + '</span><span class="cal-when">' + s.s + '–' + s.e + '</span>' +
+      (s.l ? '<span class="lv lv' + s.l[0] + '" title="' + esc(LEVELS[s.l] || s.l) + '">' + esc(s.l) + '</span>' : '') + starBtn(s) + '</div>' +
+      '<button class="cal-title" data-cal="' + esc(s.c) + '" aria-haspopup="dialog">' + esc(titleOf(s)) + '</button>' +
+      '<div class="cal-meta">' + esc([s.y, room].filter(Boolean).join(' · ')) + '</div>' +
+      (who ? '<div class="cal-meta">' + esc(who) + '</div>' : '') + '</article>';
+  }
+
+  function paintCal(out) {
+    const byDay = new Map();
+    for (const s of out.slice().sort((a, b) => timeKey(a) < timeKey(b) ? -1 : 1)) {
+      const k = s.d || '';
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(s);
+    }
+    if (!out.length) {
+      $('out').innerHTML = '<div class="empty"><b>조건에 맞는 세션이 없습니다</b>검색어를 줄이거나 필터를 몇 개 해제해 보세요.</div>';
+      return;
+    }
+    const keys = DAYS.concat(S.some(s => !s.d) ? [''] : []);
+    // 고른 날에 남은 세션이 없으면 결과가 있는 첫날을 보여 주되, 고른 날은 기억해 둔다
+    const day = byDay.has(state.opts.calDay) ? state.opts.calDay : keys.find(k => byDay.has(k));
+    const items = byDay.get(day);
+    const html = ['<div class="my"><div class="cal-days" role="group" aria-label="날짜 선택">'];
+    keys.forEach((k, i) => {
+      const n = (byDay.get(k) || []).length;
+      html.push('<button class="cal-day" data-cal-day="' + k + '" aria-pressed="' + (k === day) + '"' + (n ? '' : ' disabled') + '>' +
+        (k ? (i + 1) + '일 차 · ' + dayLabel(k) : '일정 미정') + '<span>' + n.toLocaleString() + '</span></button>');
+    });
+    html.push('</div>');
+    if (!day) {
+      html.push('<div class="list">' + items.map(s => rowHTML(s)).join('') + '</div></div>');
+      $('out').innerHTML = html.join('');
+      return;
+    }
+    const cols = VENUES.concat(items.some(s => !s.v) ? [''] : []);
+    const slots = new Map();
+    for (const s of items) {
+      const t = Math.floor(s.sm / SLOT_MIN) * SLOT_MIN;
+      if (!slots.has(t)) slots.set(t, new Map());
+      const row = slots.get(t), v = s.v || '';
+      if (!row.has(v)) row.set(v, []);
+      row.get(v).push(s);
+    }
+    html.push('<div class="cal-scroll"><div class="cal" style="--vc:' + cols.length + '">');
+    html.push('<div class="cal-h cal-corner">시간</div>' + cols.map(v => v
+      ? '<div class="cal-h"><i class="v' + (VENUES.indexOf(v) + 1) + '"></i>' + esc(v) + '</div>'
+      : '<div class="cal-h none">장소 미정</div>').join(''));
+    for (const [t, row] of slots) {
+      html.push('<div class="cal-t">' + hm(t) + '</div>' + cols.map(v =>
+        '<div class="cal-cell">' + (row.get(v) || []).map(calCard).join('') + '</div>').join(''));
+    }
+    html.push('</div></div></div>');
+    $('out').innerHTML = html.join('');
+  }
+
+  function paintDlg() {
+    const s = byCode.get(state.calPick);
+    if (s) $('dlg-body').innerHTML = '<div class="list">' + rowHTML(s) + '</div>';
+  }
+
+  let dlgFrom = null;
+  function openCal(code, from) {
+    state.calPick = code;
+    state.open.add(code);
+    paintDlg();
+    dlgFrom = from;
+    const dlg = $('dlg');
+    if (typeof dlg.showModal === 'function') { if (!dlg.open) dlg.showModal(); }
+    else dlg.setAttribute('open', '');
+    $('dlg-body').scrollTop = 0;
+  }
+
+  function setSeg(grid) {
+    $('seg').setAttribute('aria-label', state.view === 'my' ? '내 일정 보기 방식' : '전체 세션 보기 방식');
+    $('mode-grid').setAttribute('aria-pressed', String(grid));
+    $('mode-list').setAttribute('aria-pressed', String(!grid));
   }
 
   function paintRows() {
@@ -811,8 +973,7 @@ select.btn { padding-right: 0.5rem; }
     const grid = state.opts.myMode !== 'list';
     $('btn-copy').hidden = list.length === 0;
     $('seg').hidden = list.length === 0;
-    $('mode-grid').setAttribute('aria-pressed', String(grid));
-    $('mode-list').setAttribute('aria-pressed', String(!grid));
+    setSeg(grid);
     if (!list.length) {
       $('count').textContent = '';
       $('out').innerHTML = '<div class="empty"><b>아직 담은 세션이 없습니다</b>전체 세션에서 별표를 누르면 요일별 시간표로 정리됩니다.</div>';
@@ -1061,9 +1222,10 @@ select.btn { padding-right: 0.5rem; }
     $('rail').hidden = my;
     $('picked').hidden = my;
     $('q').parentElement.hidden = my;
-    $('sort').hidden = my;
+    $('sort').hidden = my || calOn();
     $('btn-filter').hidden = my;
-    if (!my) $('seg').hidden = true;
+    document.body.classList.toggle('wide', calOn());
+    if (!my) $('seg').hidden = false;
     $('copybox').hidden = true;
     if (my) { $('more').hidden = true; renderMy(); }
     else { $('btn-copy').hidden = true; renderAll(); }
@@ -1157,11 +1319,19 @@ select.btn { padding-right: 0.5rem; }
       if (b.getAttribute('data-star') !== code) return;
       b.setAttribute('aria-pressed', String(on));
       b.setAttribute('aria-label', code + (on ? ' 내 일정에서 빼기' : ' 내 일정에 담기'));
+      const card = b.closest('.cal-card');
+      if (card) card.classList.toggle('fav', on);
     });
   }
 
   // 세션 한 줄만 다시 그리고, 누른 버튼으로 포커스를 되돌린다
   function repaintRow(code, attr) {
+    if ($('dlg').open && state.calPick === code) {
+      paintDlg();
+      const b = $('dlg-body').querySelector('[' + attr + '="' + CSS.escape(code) + '"]');
+      if (b) b.focus();
+      return;
+    }
     if (state.view === 'my') { renderMy(); return; }
     const el = $('out').querySelector('.row[data-c="' + CSS.escape(code) + '"]');
     const r = state.rows.find(x => x.s.c === code);
@@ -1190,8 +1360,17 @@ select.btn { padding-right: 0.5rem; }
   /* ---------- 이벤트 ---------- */
   document.addEventListener('click', e => {
     if (!e.target.closest('#export summary')) $('export').open = false;
-    const t = e.target.closest('[data-star],[data-open],[data-orig],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],.pick');
+    const t = e.target.closest('[data-star],[data-open],[data-orig],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],[data-cal],[data-cal-day],.pick');
     if (!t) return;
+    if (t.hasAttribute('data-cal')) { openCal(t.getAttribute('data-cal'), t); return; }
+    if (t.hasAttribute('data-cal-day')) {
+      state.opts.calDay = t.getAttribute('data-cal-day');
+      store.set('ri26.opts', state.opts);
+      renderAll();
+      const box = $('out').querySelector('.cal-scroll');
+      if (box) box.scrollTop = 0;
+      return;
+    }
     if (t.hasAttribute('data-info')) {
       const k = t.getAttribute('data-info');
       const on = !state.opts.info[k];
@@ -1219,9 +1398,9 @@ select.btn { padding-right: 0.5rem; }
       return;
     }
     if (t.hasAttribute('data-mode')) {
-      state.opts.myMode = t.getAttribute('data-mode');
+      state.opts[state.view === 'my' ? 'myMode' : 'allMode'] = t.getAttribute('data-mode');
       store.set('ri26.opts', state.opts);
-      renderMy();
+      render();
       return;
     }
     if (t.hasAttribute('data-star')) toggleFav(t.getAttribute('data-star'));
@@ -1284,6 +1463,14 @@ select.btn { padding-right: 0.5rem; }
     const done = () => { $('btn-copy').textContent = '복사됨'; setTimeout(() => { $('btn-copy').textContent = '일정 복사'; }, 1500); };
     const fallback = () => { const b = $('copybox'); b.value = text; b.hidden = false; b.focus(); b.select(); };
     try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
+  });
+
+  $('dlg-x').addEventListener('click', () => $('dlg').close());
+  // 창 바깥(배경)을 누르면 닫는다
+  $('dlg').addEventListener('click', e => { if (e.target === $('dlg')) $('dlg').close(); });
+  $('dlg').addEventListener('close', () => {
+    if (dlgFrom && dlgFrom.isConnected) dlgFrom.focus();
+    dlgFrom = null;
   });
 
   document.addEventListener('keydown', e => {
