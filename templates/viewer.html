@@ -173,13 +173,18 @@ select.btn { padding-right: 0.5rem; }
 .r-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .r-en { display: block; margin-top: 0.125rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
 .r-meta { color: var(--muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
-.star {
-  align-self: start; border: none; background: none; padding: 0.25rem; border-radius: 0.25rem;
+/* 별표 = 내 일정에 확정, 책갈피 = 아직 고민 중인 후보. 둘 중 하나만 켜진다 */
+.marks { align-self: start; display: flex; align-items: center; gap: 0.125rem; }
+.star, .cand {
+  border: none; background: none; padding: 0.25rem; border-radius: 0.25rem;
   color: var(--line); line-height: 0;
 }
-.star svg { width: 1.375rem; height: 1.375rem; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.star svg, .cand svg { width: 1.375rem; height: 1.375rem; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
 .star[aria-pressed="true"] svg { fill: var(--star); stroke: var(--star); }
 .star:hover svg { stroke: var(--star); }
+.cand[aria-pressed="true"] svg { fill: var(--accent); stroke: var(--accent); }
+.cand:hover svg { stroke: var(--accent); }
+.chip.is-cand { border-style: dashed; border-color: var(--accent); color: var(--accent); }
 
 .r-detail { display: flex; flex-direction: column; gap: 0.875rem; padding-top: 0.625rem; max-width: 46rem; }
 .r-detail p { margin: 0; }
@@ -194,7 +199,7 @@ select.btn { padding-right: 0.5rem; }
 .dl .note { display: block; color: var(--muted); }
 .slots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .slots li { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-.slots .star svg { width: 1.125rem; height: 1.125rem; }
+.slots .marks svg { width: 1.125rem; height: 1.125rem; }
 .slots .when { font: 400 0.8125rem var(--font-data); }
 .slots .here { font-weight: 500; color: var(--accent); }
 
@@ -279,6 +284,40 @@ select.btn { padding-right: 0.5rem; }
 .tt-legend i { width: 0.875rem; height: 0.875rem; border-radius: 0.1875rem; border: 1px solid var(--line); }
 .tt-hint { margin: 0; color: var(--muted); font-size: 0.8125rem; }
 .my { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* 내 일정 시간표 옆 후보 목록. 올리면 시간표에 점선 블록으로 미리 보인다 */
+.my-grid { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: 1rem; align-items: start; }
+.my-grid > .my { min-width: 0; }
+.cands {
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--bar-h) + 0.5rem);
+  max-height: calc(100vh - var(--bar-h) - 1rem); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.cands-h { display: flex; gap: 0.5rem; align-items: baseline; padding-bottom: 0.375rem; border-bottom: 2px solid var(--fg); }
+.cands-h h2 { margin: 0; font: 700 1.0625rem var(--font-display); }
+.cands-h span { color: var(--muted); font-size: 0.8125rem; }
+.cands-hint { margin: 0; color: var(--muted); font-size: 0.75rem; }
+.cands-day { margin: 0.25rem 0 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.cands ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+.cd-item {
+  display: flex; flex-direction: column; gap: 0.125rem; padding: 0.375rem 0.5rem; font-size: 0.75rem;
+  background: var(--surface); border: 1px dashed var(--accent); border-radius: 0.375rem;
+}
+.cd-item:hover, .cd-item:focus-within, .cd-item.on { border-style: solid; box-shadow: inset 3px 0 0 var(--accent); }
+.cd-item.clash { border-color: var(--warn); }
+.cd-item.clash:hover, .cd-item.clash:focus-within { box-shadow: inset 3px 0 0 var(--warn); }
+.cd-clash { color: var(--warn); }
+.tt-ghost {
+  position: absolute; left: 0; right: 0; z-index: 2; pointer-events: none; overflow: hidden;
+  display: flex; flex-direction: column; gap: 0.0625rem; padding: 0.25rem 0.4375rem; font-size: 0.75rem; line-height: 1.35;
+  border: 2px dashed var(--accent); border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--accent-soft) 85%, transparent);
+}
+.tt-ghost.clash { border-color: var(--warn); background: color-mix(in srgb, var(--warn-soft) 85%, transparent); }
+@media (max-width: 70rem) {
+  .my-grid { grid-template-columns: minmax(0, 1fr); }
+  .cands { position: static; max-height: none; overflow: visible; }
+}
 .my .day-h { margin-top: 0.75rem; }
 
 /* 전체 세션 시간표: 하루씩, 건물별 열 × 30분 단위 시작 시각 행 */
@@ -318,11 +357,13 @@ body.wide .wrap { max-width: none; }
 }
 .cal-card:hover { border-color: var(--accent); }
 .cal-card.fav { border-color: var(--star); box-shadow: inset 3px 0 0 var(--star); }
+.cal-card.cand { border-color: var(--accent); border-style: dashed; box-shadow: inset 3px 0 0 var(--accent); }
 .cal-top { display: flex; gap: 0.375rem; align-items: center; }
 .cal-top .code { font-size: 0.75rem; white-space: nowrap; }
 .cal-when { font: 400 0.6875rem var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cal-top .star { margin-left: auto; padding: 0.125rem; }
-.cal-top .star svg { width: 1.125rem; height: 1.125rem; }
+.cal-top .marks { margin-left: auto; }
+.cal-top .marks button { padding: 0.125rem; }
+.cal-top .marks svg { width: 1.125rem; height: 1.125rem; }
 .cal-title {
   all: unset; cursor: pointer; font-size: 0.8125rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
@@ -357,13 +398,13 @@ body.wide .wrap { max-width: none; }
   .row { grid-template-columns: minmax(0, 1fr) auto; }
   .r-time { flex-direction: row; flex-wrap: wrap; gap: 0 0.625rem; grid-column: 1; }
   .r-main { grid-column: 1 / -1; grid-row: 2; }
-  .star { grid-column: 2; grid-row: 1; }
+  .row > .marks { grid-column: 2; grid-row: 1; }
   .hop { padding-left: 0; }
   .dl { grid-template-columns: minmax(0, 1fr); gap: 0 0; }
   .dl dd { margin-bottom: 0.5rem; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .star svg { transition: fill 0.12s, stroke 0.12s; }
+  .star svg, .cand svg { transition: fill 0.12s, stroke 0.12s; }
 }
 </style>
 
@@ -480,6 +521,8 @@ body.wide .wrap { max-width: none; }
   const NONE = '미정';
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17l-5.4 3 1.1-6.1-4.5-4.3 6.1-.8z"/></svg>';
 
+  const MARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11v17L12 16.2l-5.5 4.3z"/></svg>';
+
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = {
@@ -560,6 +603,7 @@ body.wide .wrap { max-width: none; }
     rows: []
   };
   const fav = new Set(store.get('ri26.fav', []).filter(c => byCode.has(c)));
+  const cand = new Set(store.get('ri26.cand', []).filter(c => byCode.has(c) && !fav.has(c)));
 
   /* ---------- 필터 레일 ---------- */
   function buildFacets() {
@@ -654,8 +698,13 @@ body.wide .wrap { max-width: none; }
   /* ---------- 세션 한 줄 ---------- */
   function starBtn(s) {
     const on = fav.has(s.c);
-    return '<button class="star" data-star="' + esc(s.c) + '" aria-pressed="' + on + '" aria-label="' + esc(s.c) + (on ? ' 내 일정에서 빼기' : ' 내 일정에 담기') + '">' + STAR + '</button>';
+    return '<button class="star" data-star="' + esc(s.c) + '" aria-pressed="' + on + '" aria-label="' + esc(s.c) + (on ? ' 내 일정에서 빼기' : ' 내 일정에 담기') + '" title="내 일정">' + STAR + '</button>';
   }
+  function candBtn(s) {
+    const on = cand.has(s.c);
+    return '<button class="cand" data-cand="' + esc(s.c) + '" aria-pressed="' + on + '" aria-label="' + esc(s.c) + (on ? ' 후보에서 빼기' : ' 후보에 담기') + '" title="후보">' + MARK + '</button>';
+  }
+  const marks = s => '<span class="marks">' + candBtn(s) + starBtn(s) + '</span>';
   function whenText(s) {
     return s.d ? dayLabel(s.d) + ' ' + s.s + '–' + s.e : '일정 미정';
   }
@@ -680,7 +729,7 @@ body.wide .wrap { max-width: none; }
     const sibs = groups.get(s.g);
     if (sibs.length > 1) {
       rows.push(['진행 시간', '<ul class="slots">' + sibs.map(x =>
-        '<li>' + starBtn(x) + '<span class="when' + (x.c === s.c ? ' here' : '') + '">' + esc(x.c) + ' · ' + esc(whenText(x)) + '</span>' +
+        '<li>' + marks(x) + '<span class="when' + (x.c === s.c ? ' here' : '') + '">' + esc(x.c) + ' · ' + esc(whenText(x)) + '</span>' +
         '<span>' + esc(x.v || '') + '</span></li>').join('') + '</ul>']);
     }
     [['tp', '토픽'], ['ai', '관심 분야'], ['sv', '서비스'], ['ro', '대상 직무'], ['in', '산업']].forEach(([k, label]) => {
@@ -706,6 +755,7 @@ body.wide .wrap { max-width: none; }
     if (s.l) chips.push('<span class="lv lv' + s.l[0] + '" title="' + esc(LEVELS[s.l] || s.l) + '">' + esc(s.l) + '</span>');
     if (s.lap) chips.push('<span class="chip">노트북 필요</span>');
     if (s.spon) chips.push('<span class="chip">스폰서</span>');
+    if (cand.has(s.c)) chips.push('<span class="chip is-cand">후보</span>');
     if (extra.repeats > 1) chips.push('<span class="chip rep">' + extra.repeats + '회 진행</span>');
     if (extra.clash) chips.push('<span class="chip clash">시간 겹침 · ' + esc(extra.clash.join(', ')) + '</span>');
     const meta = [s.v, (s.sp || []).map(p => p.n).filter(Boolean).join(', ')].filter(Boolean).join(' · ');
@@ -715,7 +765,7 @@ body.wide .wrap { max-width: none; }
       '<h3><button class="r-title" data-open="' + esc(s.c) + '" aria-expanded="' + open + '">' +
       (koOn(s) ? esc(s.tk) + '<span class="r-en" lang="en">' + esc(s.t) + '</span>' : esc(s.t)) + '</button></h3>' +
       (meta ? '<div class="r-meta">' + esc(meta) + '</div>' : '') +
-      (open ? detailHTML(s) : '') + '</div>' + starBtn(s) + '</article>';
+      (open ? detailHTML(s) : '') + '</div>' + marks(s) + '</article>';
   }
 
   /* ---------- 전체 세션 보기 ---------- */
@@ -755,9 +805,9 @@ body.wide .wrap { max-width: none; }
   function calCard(s) {
     const room = s.r ? s.r.split(' | ').slice(1).join(' | ') : '';
     const who = (s.sp || []).map(p => p.n).filter(Boolean).join(', ');
-    return '<article class="cal-card' + (fav.has(s.c) ? ' fav' : '') + '">' +
+    return '<article class="cal-card' + (fav.has(s.c) ? ' fav' : cand.has(s.c) ? ' cand' : '') + '">' +
       '<div class="cal-top"><span class="code">' + esc(s.c) + '</span><span class="cal-when">' + s.s + '–' + s.e + '</span>' +
-      (s.l ? '<span class="lv lv' + s.l[0] + '" title="' + esc(LEVELS[s.l] || s.l) + '">' + esc(s.l) + '</span>' : '') + starBtn(s) + '</div>' +
+      (s.l ? '<span class="lv lv' + s.l[0] + '" title="' + esc(LEVELS[s.l] || s.l) + '">' + esc(s.l) + '</span>' : '') + marks(s) + '</div>' +
       '<button class="cal-title" data-cal="' + esc(s.c) + '" aria-haspopup="dialog">' + esc(titleOf(s)) + '</button>' +
       '<div class="cal-meta">' + esc([s.y, room].filter(Boolean).join(' · ')) + '</div>' +
       (who ? '<div class="cal-meta">' + esc(who) + '</div>' : '') + '</article>';
@@ -849,14 +899,21 @@ body.wide .wrap { max-width: none; }
 
   /* ---------- 내 일정 보기 ---------- */
   function mySchedule() {
-    const list = [...fav].map(c => byCode.get(c)).filter(Boolean).sort((a, b) => timeKey(a) < timeKey(b) ? -1 : 1);
+    const byTime = set => [...set].map(c => byCode.get(c)).filter(Boolean).sort((a, b) => timeKey(a) < timeKey(b) ? -1 : 1);
+    const list = byTime(fav);
     const days = new Map();
     for (const s of list) {
       const k = s.d || '';
       if (!days.has(k)) days.set(k, []);
       days.get(k).push(s);
     }
-    return { list, days };
+    return { list, days, cands: byTime(cand) };
+  }
+
+  // 후보가 내 일정의 어떤 세션과 시간이 겹치는지
+  function candClash(s, days) {
+    if (!s.d) return [];
+    return (days.get(s.d) || []).filter(x => s.sm < x.em && x.sm < s.em).map(x => x.c);
   }
 
   function clashesOf(items) {
@@ -897,6 +954,7 @@ body.wide .wrap { max-width: none; }
 
   function listHTML(days, clashByDay) {
     const html = [];
+    if (!days.size) html.push('<div class="empty"><b>아직 확정한 세션이 없습니다</b>시간표 보기의 후보에서 별표를 누르면 내 일정으로 옮겨집니다.</div>');
     for (const [d, items] of days) {
       const clash = clashByDay.get(d);
       html.push('<section class="day"><div class="day-h"><h2>' + dayLabel(d) + '</h2><span>' + items.length + '개 세션</span></div><div class="list">');
@@ -913,14 +971,73 @@ body.wide .wrap { max-width: none; }
     return html.join('');
   }
 
-  function gridHTML(days, clashByDay) {
+  // 후보 목록. 항목에 마우스를 올리거나 포커스하면 시간표에 미리 보기 블록을 띄운다
+  function candsHTML(cands, days) {
+    const html = ['<aside class="cands" id="cands" aria-label="후보"><div class="cands-h"><h2>후보</h2><span>' + cands.length + '개</span></div>'];
+    if (!cands.length) {
+      html.push('<p class="cands-hint">전체 세션에서 책갈피를 누르면 여기에 모입니다. 올려 보면 시간표 어디에 들어갈지 보입니다.</p></aside>');
+      return html.join('');
+    }
+    html.push('<p class="cands-hint">올리면 시간표에 점선으로 표시됩니다. 별표를 누르면 내 일정으로 확정됩니다.</p>');
+    let day = null;
+    for (const s of cands) {
+      if ((s.d || '') !== day) {
+        if (day !== null) html.push('</ul>');
+        day = s.d || '';
+        html.push('<p class="cands-day">' + dayLabel(day) + '</p><ul>');
+      }
+      const clash = candClash(s, days);
+      const room = s.r ? s.r.split(' | ').slice(1).join(' | ') : '';
+      html.push('<li class="cd-item' + (clash.length ? ' clash' : '') + '" data-cd="' + esc(s.c) + '">' +
+        '<div class="cal-top"><span class="code">' + esc(s.c) + '</span><span class="cal-when">' + (s.d ? s.s + '–' + s.e : '') + '</span>' +
+        (s.l ? '<span class="lv lv' + s.l[0] + '">' + esc(s.l) + '</span>' : '') + marks(s) + '</div>' +
+        '<button class="cal-title" data-pick="' + esc(s.c) + '">' + esc(titleOf(s)) + '</button>' +
+        '<div class="cal-meta">' + esc([s.y, s.v, room].filter(Boolean).join(' · ')) + '</div>' +
+        (clash.length ? '<div class="cal-meta cd-clash">겹침 · ' + esc(clash.join(', ')) + '</div>' : '') + '</li>');
+    }
+    html.push('</ul></aside>');
+    return html.join('');
+  }
+
+  // 미리 보기 블록을 그릴 때 쓰는 시간표 눈금. gridHTML 이 그릴 때마다 갱신한다
+  let ttScale = null;
+  let ghostCode = null;
+  function showGhost(code) {
+    const old = $('out').querySelector('.tt-ghost');
+    if (old) old.remove();
+    document.querySelectorAll('.cd-item.on').forEach(el => el.classList.remove('on'));
+    const s = code && byCode.get(code);
+    if (!s || !s.d || !ttScale) return;
+    const col = $('out').querySelector('.tt-col[data-day="' + s.d + '"]');
+    if (!col) return;
+    const item = $('out').querySelector('.cd-item[data-cd="' + CSS.escape(code) + '"]');
+    if (item) item.classList.add('on');
+    const len = blockEnd(s) - s.sm;
+    const g = document.createElement('div');
+    g.className = 'tt-ghost' + (item && item.classList.contains('clash') ? ' clash' : '');
+    g.style.top = ttScale.px(s.sm) + 'px';
+    g.style.height = (len * HOUR_PX / 60) + 'px';
+    g.innerHTML = '<span class="tt-code">후보 · ' + esc(s.c) + '</span><span class="tt-time">' + s.s + '–' + s.e + '</span>' +
+      (len >= SHORT_MIN ? '<span class="tt-title">' + esc(titleOf(s)) + '</span>' : '');
+    col.appendChild(g);
+    // 가로로 스크롤되는 시간표에서 그날 열이 안 보이면 보이게 옮긴다
+    const box = col.closest('.tt-scroll');
+    const cr = col.getBoundingClientRect(), br = box.getBoundingClientRect();
+    if (cr.left < br.left || cr.right > br.right) box.scrollLeft += cr.left - br.left - 56;
+  }
+
+  function gridHTML(days, clashByDay, cands) {
     const timed = [];
     for (const [d, items] of days) if (d) timed.push(...items);
-    const html = ['<div class="my">'];
-    if (timed.length) {
-      const h0 = Math.min(8, Math.floor(Math.min(...timed.map(s => s.sm)) / 60));
-      const h1 = Math.max(18, Math.ceil(Math.max(...timed.map(blockEnd)) / 60));
+    const span = timed.concat(cands.filter(s => s.d));
+    const html = ['<div class="my-grid"><div class="my">'];
+    ttScale = null;
+    ghostCode = null;
+    if (span.length) {
+      const h0 = Math.min(8, Math.floor(Math.min(...span.map(s => s.sm)) / 60));
+      const h1 = Math.max(18, Math.ceil(Math.max(...span.map(blockEnd)) / 60));
       const px = m => (m - h0 * 60) * HOUR_PX / 60;
+      ttScale = { px };
       const height = (h1 - h0) * HOUR_PX;
       html.push('<div class="tt-scroll"><div class="tt" style="--days:' + DAYS.length + ';--hour:' + HOUR_PX + 'px">');
       html.push('<div class="tt-head"><div></div>' + DAYS.map(d =>
@@ -932,7 +1049,7 @@ body.wide .wrap { max-width: none; }
         const items = days.get(d) || [];
         const lanes = lanesOf(items);
         const clash = clashByDay.get(d) || new Map();
-        html.push('<div class="tt-col" style="height:' + height + 'px">');
+        html.push('<div class="tt-col" data-day="' + d + '" style="height:' + height + 'px">');
         for (const s of items) {
           const L = lanes.get(s.c);
           const len = blockEnd(s) - s.sm;
@@ -951,12 +1068,12 @@ body.wide .wrap { max-width: none; }
       html.push('</div></div></div>');
       const used = VENUES.filter(v => timed.some(s => s.v === v));
       html.push('<ul class="tt-legend">' + used.map(v => '<li><i class="v' + (VENUES.indexOf(v) + 1) + '"></i>' + esc(v) + '</li>').join('') + '</ul>');
-      const picked = state.pick && fav.has(state.pick) ? byCode.get(state.pick) : null;
+      const picked = state.pick && (fav.has(state.pick) || cand.has(state.pick)) ? byCode.get(state.pick) : null;
       if (picked) {
-        const clash = clashByDay.get(picked.d || '') || new Map();
-        html.push('<div class="list" id="tt-pick">' + rowHTML(picked, { clash: clash.get(picked.c) }) + '</div>');
+        const clash = fav.has(picked.c) ? (clashByDay.get(picked.d || '') || new Map()).get(picked.c) : candClash(picked, days);
+        html.push('<div class="list" id="tt-pick">' + rowHTML(picked, { clash: clash && clash.length ? clash : null }) + '</div>');
       } else {
-        html.push('<p class="tt-hint">블록을 누르면 세션 설명과 발표자가 아래에 표시됩니다.</p>');
+        html.push('<p class="tt-hint">블록이나 후보 제목을 누르면 세션 설명과 발표자가 아래에 표시됩니다.</p>');
       }
     }
     const tbd = days.get('');
@@ -964,19 +1081,20 @@ body.wide .wrap { max-width: none; }
       html.push('<section class="day"><div class="day-h"><h2>일정 미정</h2><span>' + tbd.length + '개 세션</span></div><div class="list">' +
         tbd.map(s => rowHTML(s)).join('') + '</div></section>');
     }
-    html.push('</div>');
+    html.push('</div>' + candsHTML(cands, days) + '</div>');
     return html.join('');
   }
 
   function renderMy() {
-    const { list, days } = mySchedule();
+    const { list, days, cands } = mySchedule();
     const grid = state.opts.myMode !== 'list';
     $('btn-copy').hidden = list.length === 0;
-    $('seg').hidden = list.length === 0;
+    $('seg').hidden = list.length + cands.length === 0;
     setSeg(grid);
-    if (!list.length) {
+    if (!list.length && !cands.length) {
       $('count').textContent = '';
-      $('out').innerHTML = '<div class="empty"><b>아직 담은 세션이 없습니다</b>전체 세션에서 별표를 누르면 요일별 시간표로 정리됩니다.</div>';
+      ttScale = null;
+      $('out').innerHTML = '<div class="empty"><b>아직 담은 세션이 없습니다</b>전체 세션에서 별표를 누르면 내 일정에, 책갈피를 누르면 후보에 담깁니다.</div>';
       return;
     }
     const clashByDay = new Map();
@@ -987,7 +1105,8 @@ body.wide .wrap { max-width: none; }
       clashes += c.size;
     }
     $('count').innerHTML = '<b>' + list.length + '</b>개 세션' + (clashes ? ' · 시간이 겹치는 세션 ' + clashes + '개' : '');
-    $('out').innerHTML = grid ? gridHTML(days, clashByDay) : listHTML(days, clashByDay);
+    $('out').innerHTML = grid ? gridHTML(days, clashByDay, cands) : listHTML(days, clashByDay);
+    if (!grid) ttScale = null;
   }
 
   function scheduleText() {
@@ -1002,6 +1121,7 @@ body.wide .wrap { max-width: none; }
   // [머리글, 값, 엑셀 열 너비]
   const EXPORT_COLS = [
     ['코드', s => s.c, 14],
+    ['상태', s => fav.has(s.c) ? '내 일정' : cand.has(s.c) ? '후보' : '', 9],
     ['제목', s => s.t, 60],
     ['제목(번역)', s => s.tk || '', 60],
     ['유형', s => s.y, 18],
@@ -1030,7 +1150,9 @@ body.wide .wrap { max-width: none; }
   ];
 
   function exportRows() {
-    return state.view === 'my' ? mySchedule().list : state.rows.map(r => r.s);
+    if (state.view !== 'my') return state.rows.map(r => r.s);
+    const m = mySchedule();
+    return state.opts.myMode === 'list' ? m.list : m.list.concat(m.cands);
   }
   function exportTable(list) {
     return [EXPORT_COLS.map(c => c[0])].concat(list.map(s => EXPORT_COLS.map(c => { const v = c[1](s); return v == null ? '' : v; })));
@@ -1055,7 +1177,7 @@ body.wide .wrap { max-width: none; }
       filters,
       count: list.length,
       sessions: list.map(s => ({
-        code: s.c, group: s.g, title: s.t, titleKo: s.tk || null, type: s.y, level: s.l || null, track: s.tr || null,
+        code: s.c, status: fav.has(s.c) ? 'scheduled' : cand.has(s.c) ? 'candidate' : null, group: s.g, title: s.t, titleKo: s.tk || null, type: s.y, level: s.l || null, track: s.tr || null,
         date: s.d || null, start: s.s || null, end: s.e || null, minutes: s.len || null,
         venue: s.v || null, room: s.r || null, capacity: s.cap && s.cap !== '0' ? num(s.cap) : null,
         speakers: (s.sp || []).map(p => ({ name: p.n || '', title: p.j || '', company: p.o || '' })),
@@ -1209,7 +1331,7 @@ body.wide .wrap { max-width: none; }
     const n = exportRows().length;
     $('export').hidden = n === 0;
     if (n === 0) $('export').open = false;
-    $('export-h').textContent = (state.view === 'my' ? '내 일정 ' : '추려진 ') + n.toLocaleString() + '개 세션';
+    $('export-h').textContent = (state.view === 'my' ? (cand.size && state.opts.myMode !== 'list' ? '내 일정·후보 ' : '내 일정 ') : '추려진 ') + n.toLocaleString() + '개 세션';
   }
 
   /* ---------- 공통 ---------- */
@@ -1217,7 +1339,7 @@ body.wide .wrap { max-width: none; }
     const my = state.view === 'my';
     $('tab-all').setAttribute('aria-selected', String(!my));
     $('tab-my').setAttribute('aria-selected', String(my));
-    $('my-n').textContent = fav.size;
+    updateMyN();
     $('cols').style.gridTemplateColumns = my ? 'minmax(0, 1fr)' : '';
     $('rail').hidden = my;
     $('picked').hidden = my;
@@ -1244,12 +1366,21 @@ body.wide .wrap { max-width: none; }
   const sync = { doc: null, writing: false, dirty: false };
   const setSyncNote = kind => { $('sync-note').textContent = SYNC_NOTE[kind]; };
 
-  function adopt(codes) {
-    const next = codes.filter(c => byCode.has(c));
-    if (next.length === fav.size && next.every(c => fav.has(c))) return;
-    fav.clear();
-    next.forEach(c => fav.add(c));
+  const sameAs = (list, set) => list.length === set.size && list.every(c => set.has(c));
+  function saveMarks() {
     store.set('ri26.fav', [...fav]);
+    store.set('ri26.cand', [...cand]);
+  }
+  const updateMyN = () => { $('my-n').textContent = fav.size; };
+
+  // cands 가 null 이면 계정에 후보가 아직 없던 때의 문서라 이 기기의 후보를 그대로 둔다
+  function adopt(codes, cands) {
+    const next = codes.filter(c => byCode.has(c));
+    const nextC = (cands || [...cand]).filter(c => byCode.has(c) && !next.includes(c));
+    if (sameAs(next, fav) && sameAs(nextC, cand)) return;
+    fav.clear(); next.forEach(c => fav.add(c));
+    cand.clear(); nextC.forEach(c => cand.add(c));
+    saveMarks();
     render();
   }
 
@@ -1262,7 +1393,7 @@ body.wide .wrap { max-width: none; }
     try {
       while (sync.dirty) {
         sync.dirty = false;
-        await sync.doc.set({ codes: [...fav], updatedAt: new Date().toISOString() });
+        await sync.doc.set({ codes: [...fav], cands: [...cand], updatedAt: new Date().toISOString() });
       }
       setSyncNote('on');
     } catch (e) {
@@ -1282,46 +1413,67 @@ body.wide .wrap { max-width: none; }
       if (!uid) return;
       const doc = db.doc('data/users/' + uid + '/favorites');
       const snap = await doc.get();
-      const saved = snap.exists ? (snap.data() || {}).codes : null;
-      const remote = Array.isArray(saved) ? saved : [];
+      const data = snap.exists ? (snap.data() || {}) : {};
+      const remote = Array.isArray(data.codes) ? data.codes : [];
+      const remoteC = Array.isArray(data.cands) ? data.cands : null;
       sync.doc = doc;
-      if (!store.get('ri26.synced', false) && fav.size) {
+      if (!store.get('ri26.synced', false) && (fav.size || cand.size)) {
         // 이 기기에서 처음 연결: 여기서 담아둔 것과 계정에 있던 것을 합친다
-        const before = fav.size;
-        const local = [...fav];
-        adopt([...new Set([...remote, ...local])]);
-        if (fav.size !== remote.length || before !== fav.size) push();
+        adopt([...new Set([...remote, ...fav])], [...new Set([...(remoteC || []), ...cand])]);
+        if (!sameAs(remote, fav) || !sameAs(remoteC || [], cand)) push();
       } else if (snap.exists) {
-        adopt(remote);
-      } else if (fav.size) {
+        adopt(remote, remoteC);
+        if (remoteC === null && cand.size) push();
+      } else if (fav.size || cand.size) {
         push();
       }
       store.set('ri26.synced', true);
       setSyncNote('on');
       doc.onSnapshot(s => {
         if (sync.writing || sync.dirty || s.metadata.hasPendingWrites || !s.exists) return;
-        const codes = (s.data() || {}).codes;
-        if (Array.isArray(codes)) adopt(codes);
+        const d = s.data() || {};
+        if (Array.isArray(d.codes)) adopt(d.codes, Array.isArray(d.cands) ? d.cands : null);
       }, () => setSyncNote('fail'));
     } catch (e) {
       setSyncNote('fail');
     }
   }
 
-  function toggleFav(code) {
-    if (fav.has(code)) fav.delete(code); else fav.add(code);
-    store.set('ri26.fav', [...fav]);
+  // kind 는 'fav'(내 일정) 또는 'cand'(후보). 한 세션은 둘 중 한 곳에만 담긴다
+  function toggleMark(code, kind) {
+    const set = kind === 'fav' ? fav : cand;
+    const other = kind === 'fav' ? cand : fav;
+    if (set.has(code)) set.delete(code);
+    else { set.add(code); other.delete(code); }
+    saveMarks();
     push();
-    $('my-n').textContent = fav.size;
-    if (state.view === 'my') { renderMy(); updateExport(); return; }
-    const on = fav.has(code);
-    document.querySelectorAll('[data-star]').forEach(b => {
-      if (b.getAttribute('data-star') !== code) return;
+    updateMyN();
+    const attr = kind === 'fav' ? 'data-star' : 'data-cand';
+    const refocus = () => {
+      const b = $('out').querySelector('[' + attr + '="' + CSS.escape(code) + '"]');
+      if (b && !document.activeElement.isConnected) b.focus();
+    };
+    if (state.view === 'my') { renderMy(); updateExport(); refocus(); return; }
+    const f = fav.has(code), c = cand.has(code);
+    document.querySelectorAll('[data-star="' + CSS.escape(code) + '"],[data-cand="' + CSS.escape(code) + '"]').forEach(b => {
+      const star = b.hasAttribute('data-star'), on = star ? f : c;
       b.setAttribute('aria-pressed', String(on));
-      b.setAttribute('aria-label', code + (on ? ' 내 일정에서 빼기' : ' 내 일정에 담기'));
+      b.setAttribute('aria-label', code + (star ? (on ? ' 내 일정에서 빼기' : ' 내 일정에 담기') : (on ? ' 후보에서 빼기' : ' 후보에 담기')));
       const card = b.closest('.cal-card');
-      if (card) card.classList.toggle('fav', on);
+      if (card) { card.classList.toggle('fav', f); card.classList.toggle('cand', c); }
     });
+    // 목록 줄의 "후보" 표시도 맞춘다
+    const el = $('out').querySelector('.row[data-c="' + CSS.escape(code) + '"]');
+    if (el) {
+      const r = state.rows.find(x => x.s.c === code);
+      el.outerHTML = rowHTML(byCode.get(code), r ? r.x : {});
+    }
+    if ($('dlg').open && state.calPick === code) paintDlg();
+    if ($('dlg').open) {
+      const b = $('dlg-body').querySelector('[' + attr + '="' + CSS.escape(code) + '"]');
+      if (b && !document.activeElement.isConnected) b.focus();
+    }
+    refocus();
   }
 
   // 세션 한 줄만 다시 그리고, 누른 버튼으로 포커스를 되돌린다
@@ -1360,7 +1512,7 @@ body.wide .wrap { max-width: none; }
   /* ---------- 이벤트 ---------- */
   document.addEventListener('click', e => {
     if (!e.target.closest('#export summary')) $('export').open = false;
-    const t = e.target.closest('[data-star],[data-open],[data-orig],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],[data-cal],[data-cal-day],.pick');
+    const t = e.target.closest('[data-star],[data-open],[data-orig],[data-view],[data-pick],[data-mode],[data-export],[data-more],[data-info],[data-cal],[data-cal-day],[data-cand],.pick');
     if (!t) return;
     if (t.hasAttribute('data-cal')) { openCal(t.getAttribute('data-cal'), t); return; }
     if (t.hasAttribute('data-cal-day')) {
@@ -1403,7 +1555,8 @@ body.wide .wrap { max-width: none; }
       render();
       return;
     }
-    if (t.hasAttribute('data-star')) toggleFav(t.getAttribute('data-star'));
+    if (t.hasAttribute('data-star')) toggleMark(t.getAttribute('data-star'), 'fav');
+    else if (t.hasAttribute('data-cand')) toggleMark(t.getAttribute('data-cand'), 'cand');
     else if (t.hasAttribute('data-open')) toggleOpen(t.getAttribute('data-open'));
     else if (t.hasAttribute('data-orig')) toggleOrig(t.getAttribute('data-orig'));
     else if (t.hasAttribute('data-view')) setView(t.getAttribute('data-view'));
@@ -1464,6 +1617,16 @@ body.wide .wrap { max-width: none; }
     const fallback = () => { const b = $('copybox'); b.value = text; b.hidden = false; b.focus(); b.select(); };
     try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
   });
+
+  // 후보 항목 위에 있는 동안 시간표에 미리 보기 블록을 띄운다
+  const hoverCand = e => {
+    const it = e.target.closest && e.target.closest('.cd-item');
+    const code = it ? it.getAttribute('data-cd') : null;
+    if (code !== ghostCode) { ghostCode = code; showGhost(code); }
+  };
+  $('out').addEventListener('mouseover', hoverCand);
+  $('out').addEventListener('focusin', hoverCand);
+  $('out').addEventListener('mouseleave', () => { if (ghostCode) { ghostCode = null; showGhost(null); } });
 
   $('dlg-x').addEventListener('click', () => $('dlg').close());
   // 창 바깥(배경)을 누르면 닫는다

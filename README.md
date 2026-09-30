@@ -65,6 +65,7 @@ The session data is inserted where `__CATALOG_DATA__` appears in `templates/view
 ## Notes
 
 - The 전체 세션 tab has a 목록 / 시간표 switch. 시간표 shows one day at a time, with buildings as columns and 30-minute start slots as rows. Search and filters still apply, and every run of a repeated session is shown. Click a card for its details.
+- Each session has two marks: the star (내 일정, a session you're going to) and the bookmark (후보, one you're still considering). A session holds only one of the two, so starring a 후보 moves it into 내 일정. In the 내 일정 timetable, 후보 sessions are listed on the right. Hovering over one draws a dashed preview block on the timetable, red if it overlaps a scheduled session. Exports include a 상태 column.
 - Favorites are stored in the browser. If you move or rename `catalog.html`, some browsers will lose them.
 - When the page is published as a Claude Artifact, favorites are also saved to the viewer's account and stay in sync across devices. The local file cannot do this.
 - The Export (내보내기) menu saves the list as it is currently filtered, searched, and sorted, as CSV, Excel (.xlsx), or JSON. It includes rows not yet loaded by "더 보기". In the 내 일정 tab it saves your favorites. As a Claude Artifact this needs the `downloads` capability, and the viewer confirms each save.
